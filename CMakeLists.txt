@@ -95,6 +95,13 @@ else()
   endif()
 endif()
 
+# Copies the assets
+add_custom_target(copy-files ALL
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+  ${CMAKE_CURRENT_SOURCE_DIR}/assets
+  ${CMAKE_CURRENT_BINARY_DIR}/assets
+)
+
 # Builds the library
 add_library(engine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 target_link_libraries(engine PUBLIC m ${X11_LIBRARIES} ${CMAKE_DL_LIBS})
@@ -104,4 +111,5 @@ add_library(pmast ${PMAST_SOURCES} ${PMAST_HEADERS})
 target_link_libraries(pmast PUBLIC engine)
 
 add_executable(env ${ENV_SOURCES})
+add_dependencies(env copy-files)
 target_link_libraries(env PUBLIC pmast engine)

@@ -175,7 +175,7 @@ int main() {
 
     __asm__("\n\
     .pushsection foo_image, \"a\", @progbits\n\
-    .incbin \"map.png\"\n\
+    .incbin \"assets/map.png\"\n\
     .popsection\n");
 
     printf("Image size: %ld\n", __stop_foo_image - __start_foo_image);
