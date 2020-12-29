@@ -33,10 +33,10 @@
 using namespace traffic;
 using namespace glm;
 
-// ---- MapCanvas ---- //
+//// ---- MapCanvas ---- ////
 
-MapCanvas::MapCanvas(
-	std::shared_ptr<OSMSegment> world)
+
+MapCanvas::MapCanvas(std::shared_ptr<OSMSegment> world)
 {
 	m_min_zoom = 2.0;
 	m_max_zoom = 1000.0;
@@ -65,15 +65,7 @@ MapCanvas::MapCanvas(
 	}
 }
 
-nyrem::RenderPipeline& MapCanvas::getPipeline() {
-	return l_pipeline;
-}
-
-glm::dvec2 MapCanvas::scaleWindowDistance(glm::ivec2 vec) {
-	return glm::dvec2(
-		vec.x * 2.0 / context.width(), // TODO
-		-vec.y * 2.0 / context.width()); // TODO
-}
+// ---- Apply Changes ---- //
 
 void MapCanvas::applyTranslation(glm::dvec2 rel)
 {
@@ -162,6 +154,12 @@ double MapCanvas::getRotation() const { return m_rotation; }
 double MapCanvas::getMinZoom() const { return m_min_zoom; }
 double MapCanvas::getMaxZoom() const { return m_max_zoom; }
 
+glm::dvec2 MapCanvas::scaleWindowDistance(glm::ivec2 vec) {
+	return glm::dvec2(
+		vec.x * 2.0 / context.width(), // TODO
+		-vec.y * 2.0 / context.width()); // TODO
+}
+
 double MapCanvas::getDistance(glm::dvec2 p1, glm::dvec2 p2) const {
 	return distance(p1, p2);
 }
@@ -172,6 +170,8 @@ glm::dvec2 MapCanvas::getCenter() const
 		glm::dvec2(m_map->getBoundingBox().getCenter().toVec()) :
 		glm::dvec2(0.0, 0.0);
 }
+
+// ---- Loading Routes ---- //
 
 void MapCanvas::loadMap(std::shared_ptr<traffic::OSMSegment> map)
 {
@@ -195,7 +195,8 @@ void MapCanvas::loadRoute(const Route& route, std::shared_ptr<traffic::OSMSegmen
 {
 	std::vector<vec2> points = generateRouteMesh(route, *map);
 	std::vector<vec3> colors(points.size(), glm::vec3(0.0f, 0.0f, 1.0f));
-	l_mesh_routes.push_back(genMesh(std::move(points), std::move(colors)));
+	l_mesh_routes.push_back(
+		genMesh(std::move(points), std::move(colors)));
 }
 
 void MapCanvas::clearRoutes()
@@ -271,14 +272,12 @@ glm::dvec2 MapCanvas::viewToPlane(const glm::dvec2& pos) const
 
 glm::dvec2 MapCanvas::planeToPosition(const glm::dvec2& pos) const
 {
-	return planeToSphere(
-		pos, getCenter());
+	return planeToSphere(pos, getCenter());
 }
 
 glm::dvec2 MapCanvas::positionToPlane(const glm::dvec2& pos) const
 {
-	return sphereToPlane(
-		pos, getCenter());
+	return sphereToPlane(pos, getCenter());
 }
 
 glm::dvec2 MapCanvas::windowToPosition(glm::ivec2 vec) const
@@ -323,17 +322,18 @@ void MapCanvas::render(const nyrem::RenderContext &context)
 		nyrem::RenderList<nyrem::Entity2D>
 			&renderList = l_comp->stageBuffer().renderList;
 
+		renderList.clear();
+
+		l_mesh_map->setTransformationMatrix(transform);
+		l_mesh_highway->setTransformationMatrix(transform);
+		
+		renderList.add(l_mesh_highway);
+		renderList.add(l_mesh_map);
+
 		for (const auto& t : l_mesh_routes) {
 			t->setTransformationMatrix(transform);
 			renderList.add(t);
 		}
-		l_mesh_map->setTransformationMatrix(transform);
-		l_mesh_highway->setTransformationMatrix(transform);
-
-		
-		renderList.clear();
-		renderList.add(l_mesh_highway);
-		renderList.add(l_mesh_map);
 		l_pipeline.render(context);
 	}
 }

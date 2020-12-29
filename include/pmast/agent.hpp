@@ -29,11 +29,8 @@
 #define AGENT_H
 
 #include "engine.hpp"
+#include <engine/thread.hpp>
 
-#include <memory>
-#include <ctpl.h>
-#include <future>
-#include <functional>
 
 #include "osm.hpp"
 #include "osm_graph.hpp"
@@ -78,50 +75,12 @@ namespace traffic
         int64_t nextVisited;
     };
 
-    class ConcurrencyManager {
-    public:
-        ///<summary>Creates a new Concurrency manager with the default thread size</summary>
-        ConcurrencyManager();
-        ConcurrencyManager(size_t n);
-        
-        void resize(size_t n);
-
-        ConcurrencyManager(const ConcurrencyManager&) = delete;
-        ConcurrencyManager(ConcurrencyManager &&) = default;
-
-        ConcurrencyManager& operator=(const ConcurrencyManager&) = delete;
-        ConcurrencyManager& operator=(ConcurrencyManager &&) = default;
-
-        ~ConcurrencyManager();
-
-        template<typename T, typename ...Args>
-        std::promise<T> add(const std::function<T(Args...)> &exec, Args&& ... args) {
-            std::promise<T> prom;
-            addRaw([...args = std::forward<Args>(args), &exec, &prom](int) {
-                try {
-                    prom.set_value(exec(std::forward<Args>(args)...));
-                } catch (const std::exception &excp) {
-                    prom.set_exception(excp);
-                } catch (...) {
-                    prom.set_exception(std::runtime_error("An unknwon error occurred"));
-                }
-            });
-            return prom;
-        }
-
-        void addRaw(const std::function<void(int)> &exec);
-        
-    protected:
-        struct ThreadManagerImpl;
-        std::unique_ptr<ThreadManagerImpl> m_pool;
-    };
-
 
     class World {
     public:
         // ---- Contstructors ---- //
-        World(ConcurrencyManager *manager);
-        World(ConcurrencyManager* manager, const std::shared_ptr<OSMSegment> &map);
+        World(nyrem::ConcurrencyManager *manager);
+        World(nyrem::ConcurrencyManager *manager, const std::shared_ptr<OSMSegment> &map);
 
         virtual ~World() = default;
 
@@ -138,7 +97,7 @@ namespace traffic
 
     protected:
         // ---- Member definitions ---- //
-        ConcurrencyManager *m_manager;
+        nyrem::ConcurrencyManager *m_manager;
         std::shared_ptr<OSMSegment> m_map;
         std::shared_ptr<OSMSegment> k_highway_map;
 

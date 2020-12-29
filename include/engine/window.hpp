@@ -54,7 +54,16 @@ protected:
 	int w, h;
 };
 
-// We don't have more than 256 useful keys
+using MouseType = uint8_t;
+namespace mouse
+{
+	const extern MouseType
+		NYREM_BUTTON_1, NYREM_BUTTON_2, NYREM_BUTTON_3, NYREM_BUTTON_4,
+		NYREM_BUTTON_5, NYREM_BUTTON_6, NYREM_BUTTON_7, NYREM_BUTTON_8,
+		NYREM_BUTTON_LAST, NYREM_BUTTON_LEFT, NYREM_BUTTON_RIGHT, NYREM_BUTTON_MIDDLE;
+}
+
+
 using KeyType = uint16_t;
 namespace keys
 {
@@ -99,6 +108,7 @@ struct CursorPosEvent {
 };
 struct CursorButtonEvent {
 	int button, action, mods;
+	double xpos, ypos;
 };
 struct CursorScrollEvent {
 	double xoffset, yoffset;
@@ -178,6 +188,9 @@ public:
 	/// <returns>Listener that listens to drag and drop events</returns>
 	Listener<CallbackDrop>& callbackDrop();
 
+	double cursorX() const;
+	double cursorY() const;
+	
 protected:
 	friend class Engine;
 

@@ -75,36 +75,6 @@ void Agent::makeGreedyChoice() {
     }
 }
 
-// ---- ConcurrencyManager ---- //
-
-struct ConcurrencyManager::ThreadManagerImpl {
-    ctpl::thread_pool pool;
-    
-    ThreadManagerImpl(size_t n) : pool(n) { }
-};
-
-ConcurrencyManager::~ConcurrencyManager() { }
-
-ConcurrencyManager::ConcurrencyManager()
-{
-    size_t size = std::thread::hardware_concurrency();
-    resize(size == 0 ? 8 : size);
-}
-
-ConcurrencyManager::ConcurrencyManager(size_t n)
-{
-    resize(n);
-}
-
-void ConcurrencyManager::resize(size_t size)
-{
-    m_pool = std::make_unique<ThreadManagerImpl>(size);
-}
-
-void ConcurrencyManager::addRaw(const std::function<void(int)> &exec) {
-    m_pool->pool.push(exec);
-}
-
 // ---- WorldChunk ---- //
 
 int eraseFast(std::vector<int64_t>& vector, int64_t val)
@@ -134,12 +104,12 @@ bool contains(const std::vector<int64_t>& vector, int64_t id)
 // ---- Word ---- //
 
 
-traffic::World::World(ConcurrencyManager* manager)
+traffic::World::World(nyrem::ConcurrencyManager* manager)
 {
     m_manager = manager;
 }
 
-traffic::World::World(ConcurrencyManager* manager, const std::shared_ptr<OSMSegment>& map)
+traffic::World::World(nyrem::ConcurrencyManager* manager, const std::shared_ptr<OSMSegment>& map)
 {
     m_manager = manager;
     loadMap(map);

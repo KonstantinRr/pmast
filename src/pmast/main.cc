@@ -163,39 +163,86 @@ int main(int argc, char** argv)
 	InputHandler &input = eng.input();
 
 	using namespace nyrem::keys;
+	using namespace nyrem::mouse;
 	input.callbackKey(NYREM_KEY_ESCAPE).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_RELEASED)
 			eng.shouldClose();
 	});
 
+
+	double rotateSpeed = 0.01;
+	double translateSpeed = 0.015;
+	double zoomSpeed = 1.5;
 	input.loopKey(NYREM_KEY_P).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED)
-			m_canvas->applyZoom(2);
+			m_canvas->applyZoom(zoomSpeed);
 	});
 	input.loopKey(NYREM_KEY_O).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED)
-			m_canvas->applyZoom(-2);
+			m_canvas->applyZoom(-zoomSpeed);
+	});
+
+	input.loopKey(NYREM_KEY_K).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyRotation(rotateSpeed);
+	});
+	input.loopKey(NYREM_KEY_L).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyRotation(-rotateSpeed);
 	});
 
 
-	double speed = 0.015;
 	input.loopKey(NYREM_KEY_LEFT).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED)
-			m_canvas->applyTranslation({speed, 0.0});
+			m_canvas->applyTranslation({translateSpeed, 0.0});
 	});
 	input.loopKey(NYREM_KEY_RIGHT).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED)
-			m_canvas->applyTranslation({-speed, 0.0});
+			m_canvas->applyTranslation({-translateSpeed, 0.0});
 	});
 	input.loopKey(NYREM_KEY_UP).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED)
-			m_canvas->applyTranslation({0.0, -speed});
+			m_canvas->applyTranslation({0.0, -translateSpeed});
 	});
 	input.loopKey(NYREM_KEY_DOWN).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED)
-			m_canvas->applyTranslation({0.0, speed});
+			m_canvas->applyTranslation({0.0, translateSpeed});
 	});
 
+	bool hasStart;
+	bool hasEnd;
+	glm::dvec2 start;
+	glm::dvec2 end;
+
+	input.callbackKey(NYREM_KEY_R).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED) {
+			start = m_canvas->windowToPosition(
+				{input.cursorX(), input.cursorY()});
+			hasStart = true;
+			spdlog::info("Set Start {} {}", start.x, start.y);
+		}
+	});
+	input.callbackKey(NYREM_KEY_T).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED) {
+			end = m_canvas->windowToPosition(
+				{input.cursorX(), input.cursorY()});
+			hasEnd = true;
+			spdlog::info("Set End {} {}", end.x, end.y);
+		}
+	});
+	input.callbackKey(NYREM_KEY_ENTER).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED) {
+			auto& graph = world->getGraph();
+			GraphNode& idStart = graph->findClosestNode(Point(start.x, start.y));
+			GraphNode& idStop = graph->findClosestNode(Point(end.x, end.y));
+			std::cout << "Searching route from " << idStart.nodeID << " " << idStop.nodeID << "\n";
+			Route r = graph->findRoute(idStart.nodeID, idStop.nodeID);
+			for (int64_t id : r.nodes) {
+				std::cout << "Node: " << id << "\n";
+			}
+			m_canvas->loadRoute(r, graph->getXMLMap());
+		}
+	});
 
 
     eng.setPipeline(m_canvas.get());

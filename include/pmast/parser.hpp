@@ -30,6 +30,8 @@
 
 #include "engine.hpp"
 
+#include <engine/thread.hpp>
+
 #include <ctpl.h>
 #include <string>
 #include <chrono>
@@ -57,7 +59,7 @@ namespace traffic
 	{
 		int threads = 8;
 		std::string file = "map.xmlmap";
-		ConcurrencyManager *pool = nullptr;
+		nyrem::ConcurrencyManager *pool = nullptr;
 		ParseTimings *timings = nullptr;
 	};
 

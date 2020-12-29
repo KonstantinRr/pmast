@@ -39,6 +39,20 @@ using namespace nyrem;
 // Maps each window to an engine object
 std::unordered_map<GLFWwindow*, Engine*> windowMap;
 
+const MouseType
+    mouse::NYREM_BUTTON_1 = (MouseType)GLFW_MOUSE_BUTTON_1,
+    mouse::NYREM_BUTTON_2 = (MouseType)GLFW_MOUSE_BUTTON_2,
+    mouse::NYREM_BUTTON_3 = (MouseType)GLFW_MOUSE_BUTTON_3,
+    mouse::NYREM_BUTTON_4 = (MouseType)GLFW_MOUSE_BUTTON_4,
+    mouse::NYREM_BUTTON_5 = (MouseType)GLFW_MOUSE_BUTTON_5,
+    mouse::NYREM_BUTTON_6 = (MouseType)GLFW_MOUSE_BUTTON_6,
+    mouse::NYREM_BUTTON_7 = (MouseType)GLFW_MOUSE_BUTTON_7,
+    mouse::NYREM_BUTTON_8 = (MouseType)GLFW_MOUSE_BUTTON_8,
+    mouse::NYREM_BUTTON_LAST = (MouseType)GLFW_MOUSE_BUTTON_LAST,
+    mouse::NYREM_BUTTON_LEFT = (MouseType)GLFW_MOUSE_BUTTON_LEFT,
+    mouse::NYREM_BUTTON_RIGHT = (MouseType)GLFW_MOUSE_BUTTON_RIGHT,
+    mouse::NYREM_BUTTON_MIDDLE = (MouseType)GLFW_MOUSE_BUTTON_MIDDLE;
+
 const KeyType
     keys::KEYSTATUS_PRESSED = (KeyType)GLFW_PRESS,
     keys::KEYSTATUS_RELEASED = (KeyType)GLFW_RELEASE,
@@ -171,11 +185,8 @@ void error_callback(int error, const char* description) {
     spdlog::error("Captured GLFW Window Error (Code {}): {}", error, description);
 }
 
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    windowMap[window]->keyCallback(key, scancode, action, mods);
-    //if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    //    glfwSetWindowShouldClose(window, GLFW_TRUE);
-}
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{ windowMap[window]->keyCallback(key, scancode, action, mods); }
 void character_callback(GLFWwindow* window, unsigned int codepoint)
 { windowMap[window]->characterCallback(codepoint); }
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
@@ -202,6 +213,8 @@ struct InputHandler::InputHandlerImpl {
     Listener<CallbackCursorButton> k_cb_mousebutton, k_loop_mousebutton;
     Listener<CallbackCursorScroll> k_cb_scroll;
     Listener<CallbackDrop> k_cb_drop;
+
+    double cursorX, cursorY;
 };
 
 InputHandler::InputHandler(const InputHandler & handler) {
@@ -213,8 +226,7 @@ InputHandler& InputHandler::operator=(const InputHandler& handler) {
     return *this;
 }
 
-int nyrem::InputHandler::scanCode(KeyType key) const
-{
+int nyrem::InputHandler::scanCode(KeyType key) const {
     return glfwGetKeyScancode(key);
 }
 
@@ -246,6 +258,9 @@ Listener<InputHandler::CallbackCursorPos>& InputHandler::callbackCursorPos() { r
 Listener<InputHandler::CallbackCursorButton>& InputHandler::callbackCursorButton() { return k_impl->k_cb_mousebutton; }
 Listener<InputHandler::CallbackCursorScroll>& InputHandler::callbackCursorScroll() { return k_impl->k_cb_scroll; }
 Listener<InputHandler::CallbackDrop>& InputHandler::callbackDrop() { return k_impl->k_cb_drop; }
+
+double InputHandler::cursorX() const { return k_impl->cursorX; }
+double InputHandler::cursorY() const { return k_impl->cursorY; }
 
 //// ---- WorldHandler ---- ////
 void WorldHandler::update(Engine &engine, double dt) {
@@ -309,7 +324,9 @@ void Engine::cursorPositionCallback(double xpos, double ypos) {
     input().callbackCursorPos().trigger(CursorPosEvent{xpos, ypos});
 }
 void Engine::mouseButtonCallback(int button, int action, int mods) {
-    input().callbackCursorButton().trigger(CursorButtonEvent{button, action, mods});
+    double xpos, ypos;
+    glfwGetCursorPos(k_impl->k_window, &xpos, &ypos);
+    input().callbackCursorButton().trigger(CursorButtonEvent{button, action, mods, xpos, ypos});
 }
 void Engine::scrollCallback(double xoffset, double yoffset) {
     input().callbackCursorScroll().trigger(CursorScrollEvent{xoffset, yoffset});
@@ -393,11 +410,17 @@ void Engine::mainloop()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
+        double xPos, yPos;
+        glfwGetCursorPos(k_impl->k_window, &xPos, &yPos);
+        input().k_impl->cursorX = xPos;
+        input().k_impl->cursorY = yPos;
+        
         for (const KeyType key : input().k_impl->k_loop_checks) {
             int action = glfwGetKey(k_impl->k_window, static_cast<int>(key));
             int scan = glfwGetKeyScancode(key);
             input().loopKey(key).trigger(KeyEvent{key, scan, action, 0});
         }
+
 
         int width, height;
         glfwGetFramebufferSize(k_impl->k_window, &width, &height);

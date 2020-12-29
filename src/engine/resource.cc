@@ -252,12 +252,12 @@ size_t MeshBuilder2D::minXExtentIndex() const { return impl_minXExtentIndex(vert
 size_t MeshBuilder2D::maxYExtentIndex() const { return impl_maxYExtentIndex(vertices); }
 size_t MeshBuilder2D::minYExtentIndex() const { return impl_minYExtentIndex(vertices); }
 
-float MeshBuilder2D::maxExtent() const { return glm::length(vertices[maxExtentIndex()]); }
-float MeshBuilder2D::minExtent() const { return glm::length(vertices[minExtentIndex()]); }
-float MeshBuilder2D::maxXExtent() const { return vertices[maxXExtentIndex()].x; }
-float MeshBuilder2D::minXExtent() const { return vertices[minXExtentIndex()].x; }
-float MeshBuilder2D::maxYExtent() const { return vertices[maxYExtentIndex()].y; }
-float MeshBuilder2D::minYExtent() const { return vertices[minYExtentIndex()].y; }
+float MeshBuilder2D::maxExtent() const { return vertices.empty() ? 0.0f : glm::length(vertices[maxExtentIndex()]); }
+float MeshBuilder2D::minExtent() const { return vertices.empty() ? 0.0f : glm::length(vertices[minExtentIndex()]); }
+float MeshBuilder2D::maxXExtent() const { return vertices.empty() ? 0.0f : vertices[maxXExtentIndex()].x; }
+float MeshBuilder2D::minXExtent() const { return vertices.empty() ? 0.0f : vertices[minXExtentIndex()].x; }
+float MeshBuilder2D::maxYExtent() const { return vertices.empty() ? 0.0f : vertices[maxYExtentIndex()].y; }
+float MeshBuilder2D::minYExtent() const { return vertices.empty() ? 0.0f : vertices[minYExtentIndex()].y; }
 
 glm::vec2 MeshBuilder2D::center() const {
 	return glm::vec2(
@@ -315,12 +315,17 @@ MeshBuilder2D& MeshBuilder2D::transform(const glm::mat4x4 &mat) {
 }
 
 glm::vec2 MeshBuilder2D::unitize(float unitScale) {
+	if (vertices.empty())
+		return glm::vec2(1.0f, 1.0f);
 	float sc = unitScale / maxExtent();
 	scale(sc);
 	return glm::vec2(sc, sc);
 }
 
 glm::vec2 MeshBuilder2D::unitizeAxis(float unitScale, bool keepProportion) {
+	if (vertices.empty())
+		return glm::vec2(1.0f, 1.0f);
+	
 	if (keepProportion) {
 		float sc = unitScale /
 			std::max(maxXExtent(), maxYExtent());

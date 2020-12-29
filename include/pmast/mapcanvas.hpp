@@ -53,7 +53,9 @@ public:
 	MapCanvas(
 		std::shared_ptr<traffic::OSMSegment> map);
 
-	nyrem::RenderPipeline& getPipeline();
+	inline nyrem::RenderPipeline& getPipeline() {
+		return l_pipeline;
+	}
 
 	virtual void render(const nyrem::RenderContext &context);
 

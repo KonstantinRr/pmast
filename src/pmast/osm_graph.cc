@@ -182,7 +182,11 @@ Route Graph::findRoute(int64_t start, int64_t goal)
 	int64_t stopIndex = findNodeIndex(goal);
 	if (startIndex == -1 || stopIndex == -1) {
 		printf("Could not find start/goal indices\n");
+		return Route();
 	}
+
+	if (startIndex == stopIndex)
+		return Route();
 
 	if (fastGraph) {
 		return fastGraph->findRoute(startIndex, stopIndex);
