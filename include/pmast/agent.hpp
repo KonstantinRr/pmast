@@ -32,6 +32,8 @@
 
 #include <memory>
 #include <ctpl.h>
+#include <future>
+#include <functional>
 
 #include "osm.hpp"
 #include "osm_graph.hpp"
@@ -41,18 +43,6 @@ namespace traffic
 {
     class Agent; // A single agent that takes part in the world
     class World; // The world the agent takes part of
-
-    class Entity
-    {
-    public:
-        virtual ~Entity() = default;
-        virtual void update() = 0;
-
-        bool isAlive() const;
-
-    protected:
-        bool alive;
-    };
 
     /// <summary>
     /// Agents are entities that act in the world to achieve a certain goal. Each agent
@@ -90,11 +80,40 @@ namespace traffic
 
     class ConcurrencyManager {
     public:
+        ///<summary>Creates a new Concurrency manager with the default thread size</summary>
         ConcurrencyManager();
-        ctpl::thread_pool& getPool();
+        ConcurrencyManager(size_t n);
+        
+        void resize(size_t n);
 
+        ConcurrencyManager(const ConcurrencyManager&) = delete;
+        ConcurrencyManager(ConcurrencyManager &&) = default;
+
+        ConcurrencyManager& operator=(const ConcurrencyManager&) = delete;
+        ConcurrencyManager& operator=(ConcurrencyManager &&) = default;
+
+        ~ConcurrencyManager();
+
+        template<typename T, typename ...Args>
+        std::promise<T> add(const std::function<T(Args...)> &exec, Args&& ... args) {
+            std::promise<T> prom;
+            addRaw([...args = std::forward<Args>(args), &exec, &prom](int) {
+                try {
+                    prom.set_value(exec(std::forward<Args>(args)...));
+                } catch (const std::exception &excp) {
+                    prom.set_exception(excp);
+                } catch (...) {
+                    prom.set_exception(std::runtime_error("An unknwon error occurred"));
+                }
+            });
+            return prom;
+        }
+
+        void addRaw(const std::function<void(int)> &exec);
+        
     protected:
-        ctpl::thread_pool m_pool;
+        struct ThreadManagerImpl;
+        std::unique_ptr<ThreadManagerImpl> m_pool;
     };
 
 

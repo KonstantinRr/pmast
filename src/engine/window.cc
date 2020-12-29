@@ -32,16 +32,18 @@
 
 #include <spdlog/spdlog.h>
 #include <unordered_map>
+#include <unordered_set>
 
 using namespace nyrem;
 
+// Maps each window to an engine object
 std::unordered_map<GLFWwindow*, Engine*> windowMap;
 
-KeyType
+const KeyType
     keys::KEYSTATUS_PRESSED = (KeyType)GLFW_PRESS,
     keys::KEYSTATUS_RELEASED = (KeyType)GLFW_RELEASE,
     keys::KEYSTATUS_UNKNOWN = (KeyType)GLFW_KEY_UNKNOWN;
-KeyType
+const KeyType
     keys::NYREM_KEY_UNKNOWN = (KeyType)GLFW_KEY_UNKNOWN,
     keys::NYREM_KEY_SPACE = (KeyType)GLFW_KEY_SPACE,      // Printable keys
     keys::NYREM_KEY_APOSTROPHE = (KeyType)GLFW_KEY_APOSTROPHE, // '
@@ -162,10 +164,11 @@ KeyType
     keys::NYREM_KEY_RIGHT_CONTROL = (KeyType)GLFW_KEY_RIGHT_CONTROL,
     keys::NYREM_KEY_RIGHT_ALT = (KeyType)GLFW_KEY_RIGHT_ALT,
     keys::NYREM_KEY_RIGHT_SUPER = (KeyType)GLFW_KEY_RIGHT_SUPER,
-    keys::NYREM_KEY_MENU = (KeyType)GLFW_KEY_MENU;
+    keys::NYREM_KEY_MENU = (KeyType)GLFW_KEY_MENU,
+    keys::NYREM_KEY_LAST = (KeyType)GLFW_KEY_LAST;
 
 void error_callback(int error, const char* description) {
-    spdlog::error("Captured GLFW Error: {}", description);
+    spdlog::error("Captured GLFW Window Error (Code {}): {}", error, description);
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -185,6 +188,64 @@ void drop_callback(GLFWwindow* window, int count, const char** paths)
 { windowMap[window]->dropCallback(count, paths); }
 void framebuffer_callback(GLFWwindow* window, int width, int height)
 { windowMap[window]->framebufferCallback(width, height); }
+
+//// ---- InputHandler ---- ////
+
+struct InputHandler::InputHandlerImpl {
+    Listener<CallbackSKey> k_sb_skeys[keys::NYREM_KEY_LAST];
+    Listener<CallbackLoopKey> k_loop_keys[keys::NYREM_KEY_LAST];
+    std::unordered_set<KeyType> k_loop_checks;
+    
+    Listener<CallbackKey> k_cb_key;
+    Listener<CallbackChar> k_cb_character;
+    Listener<CallbackCursorPos> k_cb_cursorpos, k_loop_cursorpos;
+    Listener<CallbackCursorButton> k_cb_mousebutton, k_loop_mousebutton;
+    Listener<CallbackCursorScroll> k_cb_scroll;
+    Listener<CallbackDrop> k_cb_drop;
+};
+
+InputHandler::InputHandler(const InputHandler & handler) {
+    k_impl = std::make_unique<InputHandlerImpl>(*(handler.k_impl));
+}
+
+InputHandler& InputHandler::operator=(const InputHandler& handler) {
+    k_impl = std::make_unique<InputHandlerImpl>(*(handler.k_impl));
+    return *this;
+}
+
+int nyrem::InputHandler::scanCode(KeyType key) const
+{
+    return glfwGetKeyScancode(key);
+}
+
+InputHandler::InputHandler()
+    : k_impl(std::make_unique< InputHandlerImpl>())
+{
+
+}
+Listener<InputHandler::CallbackSKey>& InputHandler::callbackKey(KeyType key) {
+    return k_impl->k_sb_skeys[key];
+}
+Listener<InputHandler::CallbackLoopKey>& InputHandler::loopKey(KeyType key, bool enable) {
+    if (enable) setLoopEnabled(key);
+    return k_impl->k_loop_keys[key];
+}
+void InputHandler::setLoopEnabled(KeyType key, bool val) {
+    if (val)
+        k_impl->k_loop_checks.insert(key);
+    else
+        k_impl->k_loop_checks.erase(key);
+}
+bool InputHandler::isLoopEnabled(KeyType key) const {
+    return k_impl->k_loop_checks.contains(key);
+}
+
+Listener<InputHandler::CallbackKey>& InputHandler::callbackKey() { return k_impl->k_cb_key; }
+Listener<InputHandler::CallbackChar>& InputHandler::callbackCharacter() { return k_impl->k_cb_character; }
+Listener<InputHandler::CallbackCursorPos>& InputHandler::callbackCursorPos() { return k_impl->k_cb_cursorpos; }
+Listener<InputHandler::CallbackCursorButton>& InputHandler::callbackCursorButton() { return k_impl->k_cb_mousebutton; }
+Listener<InputHandler::CallbackCursorScroll>& InputHandler::callbackCursorScroll() { return k_impl->k_cb_scroll; }
+Listener<InputHandler::CallbackDrop>& InputHandler::callbackDrop() { return k_impl->k_cb_drop; }
 
 //// ---- WorldHandler ---- ////
 void WorldHandler::update(Engine &engine, double dt) {
@@ -210,19 +271,10 @@ struct Engine::EngineImpl {
     GLFWwindow* k_window = nullptr;
 };
 
-nyrem::Engine::Engine()
+Engine::Engine()
     : k_impl(std::make_unique<EngineImpl>())
 {
 }
-
-Engine::Engine(Engine &&engine)
-    : k_impl(std::move(engine.k_impl)) { }
-
-Engine& Engine::operator=(Engine &&engine) {
-    k_impl = std::move(engine.k_impl);
-    return *this;
-}
-        
 
 Engine::~Engine() {
     if (k_impl->k_window) {
@@ -232,75 +284,131 @@ Engine::~Engine() {
     }
 }
 
-void Engine::init(const std::string &name, size_t width, size_t height) {
-    spdlog::info("Initializing GLFW Environment");
-    if (!glfwInit()) {
-        // Initialization failed
-        const char *errorMSG = "GLFW Initialization failed!";
-        spdlog::error(errorMSG);
-        throw std::runtime_error(errorMSG);
-    }
-    glfwSetErrorCallback(error_callback);
-    
-    spdlog::info("Creating GLFW Window");
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+Engine::Engine(Engine &&engine)
+    : k_impl(std::move(engine.k_impl)) { }
 
-    k_impl->k_window = glfwCreateWindow(
-        static_cast<int>(width), static_cast<int>(height),
-        name.c_str(), NULL, NULL);
-    if (!k_impl->k_window) {
-        const char *errorMSG = "GLFW Window Initialization failed!";
-        spdlog::error(errorMSG);
-        throw std::runtime_error(errorMSG);
-        // Window or OpenGL context creation failed
-    }
-    glfwSetInputMode(k_impl->k_window, GLFW_STICKY_KEYS, GLFW_TRUE);
-    glfwSetInputMode(k_impl->k_window, GLFW_LOCK_KEY_MODS, GLFW_TRUE);
-    glfwSetKeyCallback(k_impl->k_window, key_callback);
-    glfwSetCharCallback(k_impl->k_window, character_callback);
-    glfwSetCursorPosCallback(k_impl->k_window, cursor_position_callback);
-    glfwSetInputMode(k_impl->k_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    glfwSetMouseButtonCallback(k_impl->k_window, mouse_button_callback);
-    glfwSetScrollCallback(k_impl->k_window, scroll_callback);
-    glfwSetDropCallback(k_impl->k_window, drop_callback);
-    glfwSetWindowSizeCallback(k_impl->k_window, framebuffer_callback);
-
-    windowMap[k_impl->k_window] = this;
-
-    if (glfwRawMouseMotionSupported())
-        glfwSetInputMode(k_impl->k_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
-
-    
-    glfwMakeContextCurrent(k_impl->k_window);
-    if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
-        const char *errorMSG = "GLAD Initialization failed!";
-        spdlog::error(errorMSG);
-        throw std::runtime_error(errorMSG);
-    }
-
-    // initializes the window sizes
-    int w, h;
-    glfwGetFramebufferSize(k_impl->k_window, &w, &h);
-    glViewport(0, 0, w, h);
+Engine& Engine::operator=(Engine &&engine) {
+    k_impl = std::move(engine.k_impl);
+    return *this;
 }
 
-void Engine::mainloop() {
-    glfwSwapInterval(1); // VSYNC
+void Engine::swap(Engine &&engine) {
+    k_impl = std::move(engine.k_impl);
+}
+
+InputHandler& Engine::input() { return k_impl->k_input; }
+
+void Engine::keyCallback(int key, int scancode, int action, int mods) {
+    input().callbackKey().trigger(KeyEvent{key, scancode, action, mods});
+    input().callbackKey(key).trigger(KeyEvent{key, scancode, action, mods});
+}
+void Engine::characterCallback(unsigned int codepoint) {
+    input().callbackCharacter().trigger(CharEvent{codepoint});
+}
+void Engine::cursorPositionCallback(double xpos, double ypos) {
+    input().callbackCursorPos().trigger(CursorPosEvent{xpos, ypos});
+}
+void Engine::mouseButtonCallback(int button, int action, int mods) {
+    input().callbackCursorButton().trigger(CursorButtonEvent{button, action, mods});
+}
+void Engine::scrollCallback(double xoffset, double yoffset) {
+    input().callbackCursorScroll().trigger(CursorScrollEvent{xoffset, yoffset});
+}
+void Engine::dropCallback(int count, const char** paths) {
+    input().callbackDrop().trigger(DropEvent{count, paths});
+}
+
+void Engine::framebufferCallback(int width, int height) {
+    // default implementation: adapts viewport size
+    glViewport(0, 0,
+        static_cast<GLsizei>(width),
+        static_cast<GLsizei>(height));
+}
+
+void Engine::init(const std::string &name, size_t width, size_t height) {
+    try {
+        spdlog::info("Initializing GLFW Environment");
+        if (!glfwInit()) {
+            // Initialization failed
+            throw std::runtime_error("GLFW Initialization failed!");
+        }
+        glfwSetErrorCallback(error_callback);
+        
+        spdlog::info("Creating GLFW Window");
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+        // creates the GLFW window
+        k_impl->k_window = glfwCreateWindow(
+            static_cast<int>(width), static_cast<int>(height),
+            name.c_str(), NULL, NULL);
+        
+        if (!k_impl->k_window) {
+            // Window or OpenGL context creation failed
+            throw std::runtime_error("GLFW Window Initialization failed!");
+        }
+        glfwSetInputMode(k_impl->k_window, GLFW_STICKY_KEYS, GLFW_TRUE);
+        glfwSetInputMode(k_impl->k_window, GLFW_LOCK_KEY_MODS, GLFW_TRUE);
+        glfwSetKeyCallback(k_impl->k_window, key_callback);
+        glfwSetCharCallback(k_impl->k_window, character_callback);
+        glfwSetCursorPosCallback(k_impl->k_window, cursor_position_callback);
+        glfwSetInputMode(k_impl->k_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        glfwSetMouseButtonCallback(k_impl->k_window, mouse_button_callback);
+        glfwSetScrollCallback(k_impl->k_window, scroll_callback);
+        glfwSetDropCallback(k_impl->k_window, drop_callback);
+        glfwSetWindowSizeCallback(k_impl->k_window, framebuffer_callback);
+
+        windowMap[k_impl->k_window] = this;
+        
+        // support raw mouse motion
+        if (glfwRawMouseMotionSupported())
+            glfwSetInputMode(k_impl->k_window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
+        // binds the current OpenGL context to this window
+        glfwMakeContextCurrent(k_impl->k_window);
+        if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
+            // GLAD loading failed
+            throw std::runtime_error("GLAD Initialization failed!");
+        }
+
+        // initializes the window dimensions
+        int w, h;
+        glfwGetFramebufferSize(k_impl->k_window, &w, &h);
+        glViewport(0, 0, w, h);
+    } catch (const std::exception &exp) {
+        spdlog::error(exp.what());
+        throw;
+    }
+}
+
+void Engine::mainloop()
+{
+    glfwSwapInterval(1); // enable VSYNC
     double lastTime = glfwGetTime();
-    while (!glfwWindowShouldClose(k_impl->k_window)) {
+    while (!glfwWindowShouldClose(k_impl->k_window))
+    {
         double nextTime = glfwGetTime();
         double dt = nextTime - lastTime;
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+
+        for (const KeyType key : input().k_impl->k_loop_checks) {
+            int action = glfwGetKey(k_impl->k_window, static_cast<int>(key));
+            int scan = glfwGetKeyScancode(key);
+            input().loopKey(key).trigger(KeyEvent{key, scan, action, 0});
+        }
+
+        int width, height;
+        glfwGetFramebufferSize(k_impl->k_window, &width, &height);
+        RenderContext context(width, height, 1.0f);
 
         // Updates all child objects
         for (auto & tickable : k_impl->k_tickables)
             tickable->update(*this, dt);
 
         if (k_impl->k_pre_render) k_impl->k_pre_render();
-        if (k_impl->k_pipeline) k_impl->k_pipeline->render();
+        if (k_impl->k_pipeline) k_impl->k_pipeline->render(context);
         if (k_impl->k_post_render) k_impl->k_post_render();
         glfwSwapBuffers(k_impl->k_window);
         glfwPollEvents();
@@ -317,6 +425,10 @@ void Engine::removeTickable(const std::shared_ptr<EngineTickable> &tickable) {
 }
 void Engine::clearTickables() { k_impl->k_tickables.clear(); }
 
+void Engine::shouldClose() {
+    glfwSetWindowShouldClose(k_impl->k_window, GLFW_TRUE);
+}
+
 void Engine::exit()
 {
     spdlog::info("Terminating GLFW Environment");
@@ -325,34 +437,6 @@ void Engine::exit()
     glfwTerminate();
 }
 
-InputHandler& Engine::input() { return k_impl->k_input; }
-
-struct InputHandler::InputHandlerImpl {
-    Listener<CallbackKey> k_cb_key;
-    Listener<CallbackChar> k_cb_character;
-    Listener<CallbackCursorPos> k_cb_cursorpos;
-    Listener<CallbackCursorButton> k_cb_mousebutton;
-    Listener<CallbackCursorScroll> k_cb_scroll;
-    Listener<CallbackDrop> k_cb_drop;
-};
-
-int nyrem::InputHandler::scanCode(KeyType key)
-{
-    return glfwGetKeyScancode(key);
-}
-
-InputHandler::InputHandler()
-    : k_impl(std::make_unique< InputHandlerImpl>())
-{
-
-}
-
-Listener<InputHandler::CallbackKey>& InputHandler::callbackKey() { return k_impl->k_cb_key; }
-Listener<InputHandler::CallbackChar>& InputHandler::callbackCharacter() { return k_impl->k_cb_character; }
-Listener<InputHandler::CallbackCursorPos>& InputHandler::callbackCursorPos() { return k_impl->k_cb_cursorpos; }
-Listener<InputHandler::CallbackCursorButton>& InputHandler::callbackCursorButton() { return k_impl->k_cb_mousebutton; }
-Listener<InputHandler::CallbackCursorScroll>& InputHandler::callbackCursorScroll() { return k_impl->k_cb_scroll; }
-Listener<InputHandler::CallbackDrop>& InputHandler::callbackDrop() { return k_impl->k_cb_drop; }
 
 int SizedObject::width() { return w; }
 int SizedObject::height() { return h; }

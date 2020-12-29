@@ -197,7 +197,7 @@ TransformedEntity2D::TransformedEntity2D()
 TransformedEntity2D::TransformedEntity2D(int id,
     const std::shared_ptr<GLModel>& model,
     const std::shared_ptr<GLTexture2D>& texture,
-    const glm::mat3x3 &transform)
+    const glm::mat4x4 &transform)
     : Entity2D(id, model, texture), transform(transform) { }
 
 void TransformedEntity2D::setTransformationMatrix(const glm::mat4x4& mat) { transform = mat; }

@@ -27,15 +27,12 @@
 #include <pmast/agent.hpp>
 #include <pmast/parser.hpp>
 
+#include <ctpl.h>
 #include <thread>
 
 using namespace traffic;
 using namespace glm;
 using namespace std;
-
-// ---- Entity ---- //
-
-bool Entity::isAlive() const { return alive; }
 
 // ---- Agent ---- //
 
@@ -76,6 +73,36 @@ void Agent::makeGreedyChoice() {
     } else {
         // TODO
     }
+}
+
+// ---- ConcurrencyManager ---- //
+
+struct ConcurrencyManager::ThreadManagerImpl {
+    ctpl::thread_pool pool;
+    
+    ThreadManagerImpl(size_t n) : pool(n) { }
+};
+
+ConcurrencyManager::~ConcurrencyManager() { }
+
+ConcurrencyManager::ConcurrencyManager()
+{
+    size_t size = std::thread::hardware_concurrency();
+    resize(size == 0 ? 8 : size);
+}
+
+ConcurrencyManager::ConcurrencyManager(size_t n)
+{
+    resize(n);
+}
+
+void ConcurrencyManager::resize(size_t size)
+{
+    m_pool = std::make_unique<ThreadManagerImpl>(size);
+}
+
+void ConcurrencyManager::addRaw(const std::function<void(int)> &exec) {
+    m_pool->pool.push(exec);
 }
 
 // ---- WorldChunk ---- //
@@ -142,21 +169,11 @@ void traffic::World::loadMap(const std::shared_ptr<OSMSegment>& map)
 
 void traffic::World::loadMap(const std::string& file)
 {
-    // Groningen coordinates
-    // tl,tr [53.265301,6.465842][53.265301,6.675939]
-    // br,bl [53.144829,6.675939][53.144829, 6.465842]	
-    //Rect initRect = Rect::fromBorders(53.144829, 53.265301, 6.465842, 6.675939);
-
-    // Warendorf coordinates
-    // tl,tr [51.9362,7.9553][51.9362,8.0259]
-    // br,bl [51.9782,8.0259][51.9362,7.9553]
-    Rect initRect = Rect::fromBorders(51.9362, 51.9782, 7.9553, 8.0259);
-
     ParseTimings timings;
     ParseArguments args;
     args.file = file;
     args.threads = 8;
-    args.pool = &m_manager->getPool();
+    args.pool = m_manager;
     args.timings = &timings;
     
     auto newMap = std::make_shared<OSMSegment>(parseXMLMap(args));
@@ -170,12 +187,3 @@ const std::shared_ptr<OSMSegment>& traffic::World::getMap() const { return m_map
 const std::shared_ptr<OSMSegment>& traffic::World::getHighwayMap() const { return k_highway_map; }
 const std::shared_ptr<Graph>& World::getGraph() const { return m_graph; }
 const std::vector<Agent>& World::getAgents() const { return m_agents; }
-
-traffic::ConcurrencyManager::ConcurrencyManager()
-{
-    size_t size = std::thread::hardware_concurrency();
-    if (size == 0) size = 8;
-    m_pool.resize(size);
-}
-
-ctpl::thread_pool& traffic::ConcurrencyManager::getPool() { return m_pool; }

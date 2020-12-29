@@ -34,6 +34,7 @@
 #include <string>
 #include <chrono>
 
+#include "agent.hpp"
 #include "osm.hpp"
 
 using taglist_t = std::vector<std::pair<std::string, std::string>>;
@@ -56,7 +57,7 @@ namespace traffic
 	{
 		int threads = 8;
 		std::string file = "map.xmlmap";
-		ctpl::thread_pool *pool = nullptr;
+		ConcurrencyManager *pool = nullptr;
 		ParseTimings *timings = nullptr;
 	};
 

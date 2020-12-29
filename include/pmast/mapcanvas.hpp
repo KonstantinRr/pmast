@@ -41,6 +41,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 
+namespace traffic
+{
 /// <summary>
 /// A canvas that is used to render a map to the screen. This canvas uses its own
 /// OpenGL shaders to render a mesh of the map dynamically on the screen. It offers
@@ -48,12 +50,12 @@
 /// </summary>
 class MapCanvas : public nyrem::Renderable {
 public:
-	MapCanvas(std::shared_ptr<traffic::OSMSegment> map,
-		nyrem::SizedObject *size);
+	MapCanvas(
+		std::shared_ptr<traffic::OSMSegment> map);
 
 	nyrem::RenderPipeline& getPipeline();
 
-	virtual void render();
+	virtual void render(const nyrem::RenderContext &context);
 
 	// ---- Position updates ---- //
 	void setLatitude(double lat);
@@ -118,21 +120,26 @@ public:
 
 	glm::mat3 transformPlaneToView3DGLM() const;
 	glm::mat4 transformPlaneToView4DGLM() const;
-	void setActive(bool active);
 	
+	Rect rect() const; 
+
 	// ---- Callbacks ---- //
-	Listener<void(glm::dvec2)>& cb_leftclick() { return m_cb_leftclick; }
-	Listener<void(glm::dvec2)>& cb_rightclick() { return m_cb_rightclick; }
-	Listener<void(glm::dvec2)>& cb_map_moved() { return m_cb_map_moved; }
-	Listener<void(glm::dvec2)>& cb_cursor_moved() { return m_cb_cursor_moved; }
-	Listener<void(traffic::Rect)>& cb_view_changed() { return m_cb_view_changed; }
-	Listener<void(double)>& cb_zoom_changed() { return m_cb_zoom_changed; }
-	Listener<void(double)>& cb_rotation_changed() { return m_cb_rotation_changed; }
+	inline Listener<void(glm::dvec2)>& cb_leftclick() { return m_cb_leftclick; }
+	inline Listener<void(glm::dvec2)>& cb_rightclick() { return m_cb_rightclick; }
+	inline Listener<void(glm::dvec2)>& cb_map_moved() { return m_cb_map_moved; }
+	inline Listener<void(glm::dvec2)>& cb_cursor_moved() { return m_cb_cursor_moved; }
+	inline Listener<void(traffic::Rect)>& cb_view_changed() { return m_cb_view_changed; }
+	inline Listener<void(double)>& cb_zoom_changed() { return m_cb_zoom_changed; }
+	inline Listener<void(double)>& cb_rotation_changed() { return m_cb_rotation_changed; }
+
+	std::string info();
 
 protected:
 	// ---- Mesh access ---- //
+	/// <summary>Clears the currently used mesh</summary>
 	void clearMesh();
 
+	/// <summary>Generates a mesh with the given color from the segment</summary>
 	std::shared_ptr<nyrem::TransformedEntity2D> genMeshFromMap(
 		const traffic::OSMSegment &seg, glm::vec3 color);
 	std::shared_ptr<nyrem::TransformedEntity2D> genMesh(
@@ -141,50 +148,38 @@ protected:
 	void setChunkMesh(
 		const std::vector<glm::vec2>& points);
 
-	// ---- Callbacks ---- //
-	template<typename Type, typename CBType>
-	CallbackReturn<CBType> addCallback(const Type& function, std::vector<CallbackForm<CBType>> &callbacks) {
-		int32_t id = callbacks.empty() ? 0 : callbacks.back().id + 1;
-		callbacks.push_back(
-			CallbackForm<CBType>(
-				id, std::function<CBType>(function)
-			)
-		);
-		return CallbackReturn(id, &callbacks);
-	}
-
 	// ---- Member variables ---- //
 
-	Listener<void(glm::dvec2)> m_cb_leftclick;
-	Listener<void(glm::dvec2)> m_cb_rightclick;
-	Listener<void(glm::dvec2)> m_cb_map_moved;
-	Listener<void(glm::dvec2)> m_cb_cursor_moved;
-	Listener<void(traffic::Rect)> m_cb_view_changed;
-	Listener<void(double)> m_cb_zoom_changed;
-	Listener<void(double)> m_cb_rotation_changed;
+	Listener<void(glm::dvec2)> m_cb_leftclick;		// triggered on left click
+	Listener<void(glm::dvec2)> m_cb_rightclick;		// triggered on right clcik
+	Listener<void(glm::dvec2)> m_cb_map_moved;		// triggered if map moves
+	Listener<void(glm::dvec2)> m_cb_cursor_moved;	// triggered if cursor moves
+	Listener<void(traffic::Rect)> m_cb_view_changed;// triggered if view changes
+	Listener<void(double)> m_cb_zoom_changed;		// triggered if zoom changes
+	Listener<void(double)> m_cb_rotation_changed;	// triggered if rotation changes
 
-
-	std::shared_ptr<nyrem::TransformedEntity2D> l_mesh_map, l_mesh_highway;
+	// contains the overall map mesh as well as the highway mesh
+	std::shared_ptr<nyrem::TransformedEntity2D>
+		l_mesh_map, l_mesh_highway;
+	// contains a list of routes that are rendered on the screen
 	std::vector<std::shared_ptr<nyrem::TransformedEntity2D>> l_mesh_routes;
 
+	// ---- RenderPipeline ---- //
+	nyrem::RenderPipeline l_pipeline;
 	std::shared_ptr<nyrem::LineMemoryShader> l_shader;
-	std::shared_ptr<nyrem::RenderList<nyrem::Entity2D>> entities;
 	std::shared_ptr<nyrem::RenderComponent<
 		nyrem::LineStageBuffer,
 		nyrem::LineMemoryShader>> l_comp;
-	nyrem::RenderPipeline l_pipeline;
+
+
 	nyrem::SizedObject *l_size;
 
 	std::shared_ptr<traffic::OSMSegment> m_map;
 	std::shared_ptr<traffic::OSMSegment> m_highway_map;
 
-	bool m_active;
-	bool m_success;
-	bool m_render_chunk;
-	bool m_mark_update;
-	bool m_update_view;
-
+	// stores the plane coordinates
 	glm::dvec2 position;
+	// stores the last cursor plane coordinates
 	glm::dvec2 cursor;
 	double m_zoom;
 	double m_rotation;
@@ -193,4 +188,5 @@ protected:
 	double m_min_zoom;
 };
 
+}
 #endif

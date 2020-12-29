@@ -218,14 +218,14 @@ public:
     TransformedEntity2D(int id,
         const std::shared_ptr<GLModel>& model = nullptr,
         const std::shared_ptr<GLTexture2D>& texture = nullptr,
-        const glm::mat3x3 &transformation = glm::mat3(1.0f));
+        const glm::mat4x4 &transformation = glm::mat4(1.0f));
 
     void setTransformationMatrix(const glm::mat4x4 &mat);
 
     virtual glm::mat4x4 getTransformationMatrix() const;
 
 protected:
-    glm::mat3x3 transform;
+    glm::mat4x4 transform;
 };
 
 class TransformableEntity2D : public Entity2D {

@@ -119,27 +119,84 @@ void MapCanvasNano::updateKeys(double dt)
 int main(int argc, char** argv)
 {
     spdlog::info("Starting Engine Backend");
+	// Groningen coordinates
+    // tl,tr [53.265301,6.465842][53.265301,6.675939]
+    // br,bl [53.144829,6.675939][53.144829, 6.465842]	
+    //Rect initRect = Rect::fromBorders(53.144829, 53.265301, 6.465842, 6.675939);
+
+    // Warendorf coordinates
+    // tl,tr [51.9362,7.9553][51.9362,8.0259]
+    // br,bl [51.9782,8.0259][51.9362,7.9553]
+    Rect initRect = Rect::fromBorders(51.9362, 51.9782, 7.9553, 8.0259);
+
+
     Engine eng;
     eng.init("Window", 800, 600);
 
     auto manager = std::make_shared<ConcurrencyManager>();
 	auto world = std::make_shared<World>(manager.get());
 
-    SizedObject size;
-	size.setWidth(800);
-	size.setHeight(600);
-
-	auto m_canvas = std::make_shared<MapCanvas>(world->getMap(), &size);
-	m_canvas->setActive(true);
+	auto m_canvas = std::make_shared<MapCanvas>(world->getMap());
 
 	// Loads the default map
 	bool loadDefault = true;
 	if (loadDefault) {
-		world->loadMap("maps/warendorf.xmlmap");
+		ParseTimings timings;
+		ParseArguments args;
+		args.file = "maps/warendorf.xmlmap";
+		args.threads = 8;
+		args.pool = manager.get();
+		args.timings = &timings;
+
+		auto newMap = std::make_shared<OSMSegment>(parseXMLMap(args));
+		timings.summary();
+		
+		*newMap = newMap->findSquareNodes(initRect);
+
+		world->loadMap(newMap);
+		
 		m_canvas->loadMap(world->getMap());
 		m_canvas->loadHighwayMap(world->getHighwayMap());
-		m_canvas->setActive(true);
+		spdlog::info(m_canvas->info());
 	}
+
+	InputHandler &input = eng.input();
+
+	using namespace nyrem::keys;
+	input.callbackKey(NYREM_KEY_ESCAPE).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_RELEASED)
+			eng.shouldClose();
+	});
+
+	input.loopKey(NYREM_KEY_P).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyZoom(2);
+	});
+	input.loopKey(NYREM_KEY_O).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyZoom(-2);
+	});
+
+
+	double speed = 0.015;
+	input.loopKey(NYREM_KEY_LEFT).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyTranslation({speed, 0.0});
+	});
+	input.loopKey(NYREM_KEY_RIGHT).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyTranslation({-speed, 0.0});
+	});
+	input.loopKey(NYREM_KEY_UP).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyTranslation({0.0, -speed});
+	});
+	input.loopKey(NYREM_KEY_DOWN).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			m_canvas->applyTranslation({0.0, speed});
+	});
+
+
 
     eng.setPipeline(m_canvas.get());
     eng.mainloop();

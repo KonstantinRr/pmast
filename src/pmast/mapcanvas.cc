@@ -36,15 +36,8 @@ using namespace glm;
 // ---- MapCanvas ---- //
 
 MapCanvas::MapCanvas(
-	std::shared_ptr<OSMSegment> world,
-	nyrem::SizedObject *size)
+	std::shared_ptr<OSMSegment> world)
 {
-	l_size = size;
-	m_active = false;
-	m_render_chunk = false;
-	m_mark_update = false;
-	m_update_view = true;
-
 	m_min_zoom = 2.0;
 	m_max_zoom = 1000.0;
 
@@ -56,17 +49,19 @@ MapCanvas::MapCanvas(
 	using namespace nyrem;
 	try {
 		l_shader = std::make_shared<LineMemoryShader>();
-		entities = std::make_shared<RenderList<Entity2D>>();
-		l_comp = std::make_shared<RenderComponent< LineStageBuffer, LineMemoryShader>>();
-		
 		l_shader->create();
+
+		l_comp = std::make_shared<RenderComponent<
+			LineStageBuffer, LineMemoryShader>>();
 		l_comp->setShader(l_shader);
-		l_comp->stageBuffer().renderList = *entities;
+
 		l_pipeline.addStage(l_comp);
-		m_success = true;
 	}
-	catch (...) {
-		m_success = false;
+	catch (const std::exception &excp) {
+		l_shader = nullptr;
+		l_comp = nullptr;
+		l_pipeline.clear();
+		throw;
 	}
 }
 
@@ -76,8 +71,8 @@ nyrem::RenderPipeline& MapCanvas::getPipeline() {
 
 glm::dvec2 MapCanvas::scaleWindowDistance(glm::ivec2 vec) {
 	return glm::dvec2(
-		vec.x * 2.0 / l_size->width(), // TODO
-		-vec.y * 2.0 / l_size->width()); // TODO
+		vec.x * 2.0 / context.width(), // TODO
+		-vec.y * 2.0 / context.width()); // TODO
 }
 
 void MapCanvas::applyTranslation(glm::dvec2 rel)
@@ -103,7 +98,7 @@ void MapCanvas::resetView()
 	auto centerPoint = sphereToPlane(getCenter());
 	position = { centerPoint.x, centerPoint.y };
 	cursor = { 0.0, 0.0 };
-	m_zoom = 25.0;
+	m_zoom = 25;
 	m_rotation = 0.0;
 
 	cb_map_moved().trigger(getPosition());
@@ -137,14 +132,14 @@ void MapCanvas::setPosition(glm::dvec2 pos)
 {
 	position = pos;
 	cb_map_moved().trigger(getPosition());
-	cb_view_changed().trigger(Rect());
+	cb_view_changed().trigger(rect());
 }
 
 void MapCanvas::setZoom(double zoom)
 {
 	m_zoom = zoom;
 	cb_zoom_changed().trigger(getZoom());
-	cb_view_changed().trigger(Rect());
+	cb_view_changed().trigger(rect());
 }
 
 void MapCanvas::setRotation(double rotation)
@@ -173,12 +168,9 @@ double MapCanvas::getDistance(glm::dvec2 p1, glm::dvec2 p2) const {
 
 glm::dvec2 MapCanvas::getCenter() const
 {
-	if (m_map) {
-		return m_map->getBoundingBox().getCenter().toVec();
-	}
-	else {
-		return glm::dvec2(0.0, 0.0);
-	}
+	return m_map ?
+		glm::dvec2(m_map->getBoundingBox().getCenter().toVec()) :
+		glm::dvec2(0.0, 0.0);
 }
 
 void MapCanvas::loadMap(std::shared_ptr<traffic::OSMSegment> map)
@@ -215,18 +207,6 @@ void MapCanvas::clearRoutes()
 
 bool MapCanvas::hasMap() const { return m_map.get(); }
 
-
-/*
-void MapCanvas::setChunkMesh(const std::vector<glm::vec2> &points)
-{
-}
-*/
-
-void MapCanvas::setActive(bool active)
-{
-	m_active = active;
-}
-
 // ---- Mesh ---- //
 
 std::shared_ptr<nyrem::TransformedEntity2D> MapCanvas::genMeshFromMap(
@@ -240,12 +220,12 @@ std::shared_ptr<nyrem::TransformedEntity2D> MapCanvas::genMeshFromMap(
 std::shared_ptr<nyrem::TransformedEntity2D> MapCanvas::genMesh(
 	std::vector<glm::vec2>&& points, std::vector<glm::vec3>&& colors)
 {
-
 	nyrem::MeshBuilder2D builder;
 	builder.setVertices(std::move(points));
 	builder.setColors(std::move(colors));
-	//builder.centerModel();
-	//builder.unitize();
+
+	spdlog::info(builder.info());
+
 	auto exp = builder.exporter()
 		.addVertex().addColor()
 		.exportData();
@@ -262,14 +242,14 @@ void MapCanvas::clearMesh() {
 
 glm::dvec2 MapCanvas::windowToView(glm::ivec2 vec) const {
 	return glm::dvec2(
-		vec.x * 2.0 / l_size->width() - 1.0,
-		(l_size->height() - vec.y) * 2.0 / l_size->height() - 1.0);
+		vec.x * 2.0 / context.width() - 1.0,
+		(context.height() - vec.y) * 2.0 / context.height() - 1.0);
 }
 
 glm::ivec2 MapCanvas::viewToWindow(glm::dvec2 vec) const {
 	return glm::ivec2(
-		(int32_t)((vec.x + 1.0) / 2.0 * l_size->width()),
-		-((int32_t)((vec.y + 1.0) / 2.0 * l_size->height()) - l_size->height())
+		(int32_t)((vec.x + 1.0) / 2.0 * context.width()),
+		-((int32_t)((vec.y + 1.0) / 2.0 * context.height()) - context.height())
 	);
 }
 
@@ -277,13 +257,13 @@ glm::dvec2 MapCanvas::planeToView(const glm::dvec2& pos) const
 {
 	glm::dvec2 f = pos - position;
 	f = glm::rotate(f, m_rotation);
-	f = f * dvec2(m_zoom, m_zoom * l_size->width() / l_size->height());
+	f = f * dvec2(m_zoom, m_zoom * context.width() / context.height());
 	return f;
 }
 
 glm::dvec2 MapCanvas::viewToPlane(const glm::dvec2& pos) const
 {
-	glm::dvec2 f = pos / dvec2(m_zoom, m_zoom * l_size->width() / l_size->height());
+	glm::dvec2 f = pos / dvec2(m_zoom, m_zoom * context.width() / context.height());
 	f = glm::rotate(f, -m_rotation);
 	f = f + position;
 	return f;
@@ -317,29 +297,9 @@ glm::ivec2 MapCanvas::positionToWindow(glm::dvec2 vec) const
 	return window;
 }
 
-/*
-Matrix3f MapCanvas::transformPlaneToView3D() const
-{
-	glm::mat3 matrix(1.0f);
-	glm::translate(matrix, vec2(-position));
-	glm::rotate(matrix, (float)m_rotation);
-	glm::scale(matrix, glm::vec2(m_zoom, m_zoom * l_size->width() / l_size->height()));
-	return toView(matrix);
-}
-
-Matrix4f MapCanvas::transformPlaneToView4D() const {
-	Matrix4f translate = Matrix4f::translate(
-		Vector3f(-position.x, -position.y, 0.0f));
-	Matrix4f rotation = Matrix4f::rotate(Vector3f(0.0f, 0.0f, 1.0f), m_rotation);
-	Matrix4f scale = Matrix4f::scale(
-		Vector3f(m_zoom, m_zoom * l_size->width() / l_size->height(), 1.0f));
-	return scale * rotation * translate;
-}
-*/
-
 glm::mat3 MapCanvas::transformPlaneToView3DGLM() const {
 	glm::mat3 mat(1.0f);
-	mat = glm::scale(mat, glm::vec2(m_zoom, m_zoom * l_size->width() / l_size->height()));
+	mat = glm::scale(mat, glm::vec2(m_zoom, m_zoom * context.width() / context.height()));
 	mat = glm::rotate(mat, (float)m_rotation);
 	mat = glm::translate(mat, glm::vec2(-position.x, -position.y));
 	return mat;
@@ -347,32 +307,51 @@ glm::mat3 MapCanvas::transformPlaneToView3DGLM() const {
 
 glm::mat4 MapCanvas::transformPlaneToView4DGLM() const {
 	glm::mat4 mat(1.0f);
-    mat = glm::scale(mat, glm::vec3(m_zoom, m_zoom * l_size->width() / l_size->height(), 1.0f));
+	mat = glm::scale(mat, glm::vec3(m_zoom, m_zoom * context.width() / context.height(), 1.0f));
 	mat = glm::rotate(mat, (float)m_rotation, {0.0F, 0.0F, 1.0F});
 	mat = glm::translate(mat, glm::vec3(-position.x, -position.y, 0.0f));
 	return mat;
 }
 
-void MapCanvas::render()
+void MapCanvas::render(const nyrem::RenderContext &context)
 {
-	if (m_active && m_success && hasMap()) {
+	// calls the parent render functions
+	storeContext(context);
+	if (hasMap()) {
 		auto transform = transformPlaneToView4DGLM();
-		// Chunk rendering
-		if (m_render_chunk)
-		{
 
-		}
-		
-		
-		entities->clear();
+		nyrem::RenderList<nyrem::Entity2D>
+			&renderList = l_comp->stageBuffer().renderList;
+
 		for (const auto& t : l_mesh_routes) {
 			t->setTransformationMatrix(transform);
-			entities->add(t);
+			renderList.add(t);
 		}
 		l_mesh_map->setTransformationMatrix(transform);
 		l_mesh_highway->setTransformationMatrix(transform);
-		entities->add(l_mesh_highway);
-		entities->add(l_mesh_map);
-		l_pipeline.render();
+
+		
+		renderList.clear();
+		renderList.add(l_mesh_highway);
+		renderList.add(l_mesh_map);
+		l_pipeline.render(context);
 	}
+}
+
+Rect MapCanvas::rect() const {
+	return Rect::fromCenter(
+		position.x, position.y, m_zoom, m_zoom);
+}
+
+std::string MapCanvas::info() {
+	return fmt::format("MapCanvas Object\n"
+		"\tposition: {} {}\n"
+		"\tcursor:   {} {}\n"
+		"\trotation: {}\n"
+		"\tzoom:     {}\n"
+		"\trect:     {}\n",
+		position.x, position.y,
+		cursor.x, cursor.y,
+		m_rotation, m_zoom,
+		rect().summary());
 }

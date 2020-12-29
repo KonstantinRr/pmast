@@ -53,12 +53,10 @@ struct CallbackReturn {
 	bool isActive() const { return id != -1; }
 	void remove() {
 		for (size_t i = 0; i < parent->size();) {
-			if ((*parent)[i].id == id) {
+			if ((*parent)[i].id == id)
 				parent->erase(parent->begin() + i);
-			}
-			else {
+			else
 				i++;
-			}
 		}
 		id = -1;
 	}
@@ -88,6 +86,7 @@ public:
 		}
 	}
 
+	bool empty() { return callbacks.empty(); }
 	void clear() { callbacks.clear(); }
 };
 

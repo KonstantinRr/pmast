@@ -33,16 +33,28 @@
 
 using namespace nyrem;
 
+RenderContext::RenderContext(size_t w, size_t h, float s)
+    : w(w), h(h), s(s) { }
+
+void Renderable::render(const RenderContext &context) {
+    storeContext(context);
+}
+
+void Renderable::storeContext(const RenderContext &context) {
+    this->context = context;
+}
+
+
 ShaderBase::ShaderBase(bool hasVertexShader, bool hasFragmentShader)
-    : hasVertexShader(hasVertexShader),
-    hasFragmentShader(hasFragmentShader),
-    program(std::numeric_limits<GLuint>::max())
 {
+    if (hasVertexShader)
+        flags |= BIT_HAS_VERT_SHADER;
+    if (hasFragmentShader)
+        flags |= BIT_HAS_FRAG_SHADER;
 }
 
 ShaderBase::ShaderBase(ShaderBase&& sh)
-    : hasFragmentShader(std::exchange(sh.hasFragmentShader, false))
-    , hasVertexShader(std::exchange(sh.hasVertexShader, false))
+    : flags(std::exchange(sh.flags, 0))
     , program(std::exchange(sh.program, std::numeric_limits<GLuint>::max()))
 {
 }
@@ -50,8 +62,7 @@ ShaderBase::ShaderBase(ShaderBase&& sh)
 ShaderBase& ShaderBase::operator=(ShaderBase&& sh)
 {
     cleanUp();
-    hasFragmentShader = std::exchange(sh.hasFragmentShader, false);
-    hasVertexShader = std::exchange(sh.hasVertexShader, false);
+    flags = std::exchange(sh.flags, false);
     program = std::exchange(sh.program, std::numeric_limits<GLuint>::max());
     return *this;
 }
@@ -59,10 +70,7 @@ ShaderBase& ShaderBase::operator=(ShaderBase&& sh)
 ShaderBase::~ShaderBase() { cleanUp(); }
 void ShaderBase::cleanUp()
 {
-    if (program != std::numeric_limits<GLuint>::max()) {
-        glDeleteProgram(program);
-        program = std::numeric_limits<GLuint>::max();
-    }
+    cleanupProgram();
 }
 
 void showShaderLog(GLuint shader) {
@@ -86,74 +94,114 @@ void showInfoLog(GLuint program) {
 }
 
 void ShaderBase::cleanupParts(GLuint vertex_shader, GLuint fragment_shader) {
-    if (hasVertexShader) CGL(glDeleteShader(vertex_shader));
-    if (hasFragmentShader) CGL(glDeleteShader(fragment_shader));
+    if ((flags & BIT_HAS_VERT_SHADER) && (flags && BIT_CREATED_VERT)) {
+        CGL(glDeleteShader(vertex_shader));
+        flags &= ~BIT_CREATED_VERT;
+    }
+    if ((flags & BIT_HAS_FRAG_SHADER) && (flags && BIT_CREATED_FRAG)) {
+        CGL(glDeleteShader(fragment_shader));
+        flags &= ~BIT_CREATED_FRAG;
+    }
+}
+
+void ShaderBase::cleanupProgram() {
+    if (flags & BIT_CREATED_PROG) {
+        glDeleteProgram(program);
+        flags &= ~BIT_CREATED_PROG;
+    }
 }
 
 void ShaderBase::create() {
-    int success;
+    try {
+        int success;
 
-    program = glCreateProgram();
-    GLuint vertex_shader = 0, fragment_shader = 0;
+        program = glCreateProgram();
+        flags |= BIT_CREATED_PROG;
 
-    if (hasVertexShader) {
-        spdlog::info("Creating vertex shader");
-        auto src = retrieveVertexShader();
-        spdlog::info("Retrieved shader source \n'{}'", src.data());
+        GLuint vertex_shader = 0;
+        GLuint fragment_shader = 0;
 
-        vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-        const GLchar *srcPointer = (const GLchar *)src.data();
-        CGL(glShaderSource(vertex_shader, 1, &(srcPointer), NULL));
-        CGL(glCompileShader(vertex_shader));
-        CGL(glAttachShader(program, vertex_shader));
+        if (flags & BIT_HAS_VERT_SHADER) {
+            spdlog::info("Creating vertex shader");
+            auto src = retrieveVertexShader();
+            spdlog::info("Retrieved shader source \n'{}'", src.data());
 
-        CGL(glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success));
-        if(!success) {
-            showShaderLog(vertex_shader);
-            cleanupParts(vertex_shader, fragment_shader);
-            throw std::runtime_error("Could not load vertex shader");
+            vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+            flags |= BIT_CREATED_VERT;
+            const GLchar *srcPointer = (const GLchar*)src.data();
+            CGL(glShaderSource(vertex_shader, 1, &(srcPointer), NULL));
+            CGL(glCompileShader(vertex_shader));
+            CGL(glAttachShader(program, vertex_shader));
+
+            CGL(glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success));
+            if(!success) {
+                showShaderLog(vertex_shader);
+                cleanupParts(vertex_shader, fragment_shader);
+                cleanupProgram();
+                throw std::runtime_error("Could not load vertex shader");
+            }
+            spdlog::info("Compiled vertex shader successful");
+        } else {
+            spdlog::warn("Shaders programs without vertex stage are not allowed");
         }
-    }
-    
-    if (hasFragmentShader) {
-        spdlog::info("Creating Fragment Shader");
-        auto src = retrieveFragmentShader();
-        spdlog::info("Source {}", src.data());
+        
+        if (flags & BIT_HAS_FRAG_SHADER) {
+            spdlog::info("Creating Fragment Shader");
+            auto src = retrieveFragmentShader();
+            spdlog::info("Source {}", src.data());
 
-        fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-        const GLchar *srcPointer = (const GLchar *)src.data();
-        CGL(glShaderSource(fragment_shader, 1, &srcPointer, NULL));
-        CGL(glCompileShader(fragment_shader));
-        CGL(glAttachShader(program, fragment_shader));
+            fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+            flags |= BIT_CREATED_FRAG;
+            const GLchar *srcPointer = (const GLchar *)src.data();
+            CGL(glShaderSource(fragment_shader, 1, &srcPointer, NULL));
+            CGL(glCompileShader(fragment_shader));
+            CGL(glAttachShader(program, fragment_shader));
 
-        CGL(glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success));
+            CGL(glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success));
+            if(!success) {
+                showShaderLog(fragment_shader);
+                cleanupParts(vertex_shader, fragment_shader);
+                cleanupProgram();
+                throw std::runtime_error("Could not load fragment shader");
+            };
+            spdlog::info("Compiled fragment shader successful");
+        } else {
+            spdlog::warn("Shaders programs without vertex stage are not allowed");
+        }
+
+        CGL(glLinkProgram(program));
+        CGL(glGetProgramiv(program, GL_LINK_STATUS, &success));
         if(!success) {
-            showShaderLog(fragment_shader);
+            showInfoLog(program);
             cleanupParts(vertex_shader, fragment_shader);
-            throw std::runtime_error("Could not load fragment shader");
-        };
-    }
+            cleanupProgram();
+            throw std::runtime_error("Could not link shader");
+        }
+        flags |= BIT_LINKED;
 
-    CGL(glLinkProgram(program));
-    CGL(glGetProgramiv(program, GL_LINK_STATUS, &success));
-    if(!success) {
-        showInfoLog(program);
         cleanupParts(vertex_shader, fragment_shader);
-        throw std::runtime_error("Could not link shader");
+        spdlog::info("Shaders successfully linked");
+        initializeUniforms();
+        spdlog::info("Uniforms successfully loaded");
+    } catch (const std::exception &excp) {
+        spdlog::error("Could not create shader {}", excp.what());
+        throw;
     }
-
-    cleanupParts(vertex_shader, fragment_shader);
-    spdlog::info("Shaders successfully linked");
-    initializeUniforms();
-    spdlog::info("Uniforms successfully loaded");
 }
 
 void ShaderBase::bind() {
+    if (!valid()) {
+        throw std::runtime_error("Shader is not valid()");
+    }
     CGL(glUseProgram(program));
 }
 
 void ShaderBase::release() {
     CGL(glUseProgram(0));
+}
+
+bool ShaderBase::valid() {
+    return flags & BIT_LINKED != 0;
 }
 
 void ShaderBase::loadFloat(GLint location, float value) { CGL(glUniform1f(location, value)); }
@@ -178,9 +226,10 @@ void ShaderBase::loadMat4x3(GLint location, const glm::mat4x3 &mat) { CGL(glUnif
 void ShaderBase::loadMat4x4(GLint location, const glm::mat4x4 &mat) { CGL(glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat))); }
 
 
-GLint ShaderBase::uniformLocation(const std::string &name) {
+GLint ShaderBase::uniformLocation(const std::string &name, bool required) {
     GLint v = glGetUniformLocation(program, name.c_str());
-    //if (v == -1) throw std::runtime_error("Could not load uniform " + name);
+    if (required && v == -1)
+        throw std::runtime_error("Could not load uniform " + name);
     return v;
 }
 
@@ -209,10 +258,9 @@ void RenderPipeline::clear() {
     renders.clear();
 }
 
-void RenderPipeline::render() {
-    for (auto v : renders) {
-        v->render();
-    }
+void RenderPipeline::render(const RenderContext &context) {
+    for (auto v : renders)
+        v->render(context);
 }
 
 

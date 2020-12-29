@@ -616,9 +616,10 @@ size_t OSMSegment::getSize() const {
 
 OSMSegment OSMSegment::findSquareNodes(const Rect& r) const {
 
-	return findNodes(
-		OSMFinder()
-			.setNodeAccept([r](const OSMNode& nd) { return r.contains(Point(nd.getLat(), nd.getLon())); })
+	return findNodes(OSMFinder()
+		.setNodeAccept([r](const OSMNode& nd) {
+			return r.contains(Point(nd.getLat(), nd.getLon()));
+		})
 	);
 }
 
@@ -761,6 +762,8 @@ void traffic::OSMSegment::setBoundingBox(const Rect& rect) noexcept
 	upperLat = rect.upperLatBorder();
 	lowerLon = rect.lowerLonBorder();
 	upperLon = rect.upperLonBorder();
+
+	
 }
 
 

@@ -234,6 +234,7 @@ namespace nyrem {
         size_t minYExtentIndex() const;
 
         glm::vec2 center() const;
+        glm::vec2 massCenter() const;
 
         MeshBuilder2D& scale(float scale);
         MeshBuilder2D& scale(float scaleX, float scaleY);
@@ -245,8 +246,12 @@ namespace nyrem {
         MeshBuilder2D& transform(const glm::mat4x4 &mat);
         //void rotate(glm::vec2 rotation);
 
-        void unitize(float unitScale=1.0f, bool keepProportion=true);
-        void centerModel();
+        glm::vec2 unitize(float unitScale=1.0f);
+        glm::vec2 unitizeAxis(float unitScale=1.0f, bool keepProportion=true);
+        glm::vec2 centerModel();
+
+        glm::mat3x3 unitizeMatrix(float unitScale=1.0f, bool keepProportion=true) const;
+        glm::mat3x3 centerMatrix() const;
 
         void addVertex(glm::vec2 vertex);
         void addTextureCoord(glm::vec2 texture);
@@ -294,6 +299,8 @@ namespace nyrem {
 
         std::vector<Vertex2D> toVertexArray(float scaleModif=1.0f);
         std::vector<Vertex2D> toVertexArrayIndexed(float scaleModif=1.0f);
+
+        std::string info();
     };
 
     //usin

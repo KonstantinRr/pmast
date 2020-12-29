@@ -31,6 +31,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtx/norm.hpp>
+#include <fmt/format.h>
 
 #include <limits>
 #include <cassert>
@@ -180,32 +181,32 @@ size_t impl_maxExtentIndex(const std::vector<VType> &vertices) {
 template<typename VType>
 size_t impl_maxXExtentIndex(const std::vector<VType> &vertices) {
 	return findClosestIndex([](const VType &v1, const VType &v2) {
-		return std::abs(v1.x) > std::abs(v2.x); }, vertices);
+		return v1.x > v2.x; }, vertices);
 }
 template<typename VType>
 size_t impl_minXExtentIndex(const std::vector<VType> &vertices) {
 	return findClosestIndex([](const VType &v1, const VType &v2) {
-		return std::abs(v1.x) < std::abs(v2.x); }, vertices);
+		return v1.x < v2.x; }, vertices);
 }
 template<typename VType>
 size_t impl_maxYExtentIndex(const std::vector<VType> &vertices) {
 	return findClosestIndex([](const VType &v1, const VType &v2) {
-		return std::abs(v1.y) > std::abs(v2.y); }, vertices);
+		return v1.y > v2.y; }, vertices);
 }
 template<typename VType>
 size_t impl_minYExtentIndex(const std::vector<VType> &vertices) {
 	return findClosestIndex([](const VType &v1, const VType &v2) {
-		return std::abs(v1.y) < std::abs(v2.y); }, vertices);
+		return v1.y < v2.y; }, vertices);
 }
 template<typename VType>
 size_t impl_maxZExtentIndex(const std::vector<VType> &vertices) {
 	return findClosestIndex([](const VType &v1, const VType &v2) {
-		return std::abs(v1.y) > std::abs(v2.y); }, vertices);
+		return v1.z > v2.z; }, vertices);
 }
 template<typename VType>
 size_t impl_minZExtentIndex(const std::vector<VType> &vertices) {
 	return findClosestIndex([](const VType &v1, const VType &v2) {
-		return std::abs(v1.z) < std::abs(v2.z); }, vertices);
+		return v1.z < v2.z; }, vertices);
 }
 
 // ---- Helper functions ---- //
@@ -259,6 +260,13 @@ float MeshBuilder2D::maxYExtent() const { return vertices[maxYExtentIndex()].y; 
 float MeshBuilder2D::minYExtent() const { return vertices[minYExtentIndex()].y; }
 
 glm::vec2 MeshBuilder2D::center() const {
+	return glm::vec2(
+		(maxXExtent() + minXExtent()) / 2.0,
+		(maxYExtent() + minYExtent()) / 2.0
+	);
+}
+
+glm::vec2 MeshBuilder2D::massCenter() const {
 	glm::vec2 average = { 0.0f, 0.0f };
 	for (const glm::vec2 vec : vertices)
 		average += vec;
@@ -306,20 +314,49 @@ MeshBuilder2D& MeshBuilder2D::transform(const glm::mat4x4 &mat) {
 	return *this;
 }
 
-void MeshBuilder2D::unitize(float unitScale, bool keepProportion) {
+glm::vec2 MeshBuilder2D::unitize(float unitScale) {
+	float sc = unitScale / maxExtent();
+	scale(sc);
+	return glm::vec2(sc, sc);
+}
+
+glm::vec2 MeshBuilder2D::unitizeAxis(float unitScale, bool keepProportion) {
 	if (keepProportion) {
-		scale(unitScale / maxExtent());
+		float sc = unitScale /
+			std::max(maxXExtent(), maxYExtent());
+		scale(sc);
+		return glm::vec2(sc, sc);
 	} else {
-		scale(
+		glm::vec2 sc = {
 			unitScale / maxXExtent(),
-			unitScale / maxYExtent()
-		);
+			unitScale / maxYExtent()};
+		scale(sc.x, sc.y);
+		return sc;
 	}
 }
 
-void MeshBuilder2D::centerModel() {
-	translate(-center());
+glm::vec2 MeshBuilder2D::centerModel() {
+	glm::vec2 trans = -center();
+	translate(trans);
+	return trans;
 }
+
+glm::mat3x3 MeshBuilder2D::unitizeMatrix(float unitScale, bool keepProportion) const {
+	if (keepProportion) {
+		float sc = unitScale / maxExtent();
+		return glm::scale(glm::mat3(1.0f), glm::vec2(sc, sc));
+	} else {
+		return glm::scale(glm::mat3(1.0f), glm::vec2(
+			unitScale / maxXExtent(),
+			unitScale / maxYExtent()
+		));
+	}	
+}
+
+glm::mat3x3 MeshBuilder2D::centerMatrix() const {
+	return glm::translate(glm::mat3(1.0f), -center());
+}
+
 
 void MeshBuilder2D::addVertex(glm::vec2 vertex) { vertices.push_back(vertex); }
 void MeshBuilder2D::addTextureCoord(glm::vec2 vertex) { texCoords.push_back(vertex); }
@@ -373,6 +410,21 @@ std::vector<Vertex2D> MeshBuilder2D::toVertexArrayIndexed(float scaleModif) {
 	//	vertexData[i] = vertices[i] * scaleModif;
 	//}
 	return vertexData;
+}
+
+std::string MeshBuilder2D::info() {
+	return fmt::format("MeshBuilder2D Object\n"
+		"\tVertices  {} indices {}\n"
+		"\tTexCoords {} indices {}\n"
+		"\tColors    {} indices {}\n"
+		"\tminX {}, maxX {}\n"
+		"\tminY {}, maxY {}\n",
+		vertices.size(), v_indices.size(),
+		texCoords.size(), vt_indices.size(),
+		colors.size(), vc_indices.size(),
+		minXExtent(), maxXExtent(),
+		minYExtent(), maxYExtent()
+	);
 }
 
 ///////////////////////////////

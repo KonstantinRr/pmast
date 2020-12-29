@@ -17,7 +17,7 @@ option(OPTIMIZE_SPEED "Optimizes for speed" OFF)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 # The project and dependencies rely on the CXX17 standard.
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 

@@ -498,7 +498,8 @@ OSMSegment traffic::parseXMLMap(const ParseArguments &args)
 
 	ctpl::thread_pool* usedPool;
 	if (args.pool) {
-		usedPool = args.pool;
+		// TODO fix this shit
+		usedPool = new ctpl::thread_pool(args.threads);
 	} else {
 		usedPool = new ctpl::thread_pool(args.threads);
 	}

@@ -54,11 +54,13 @@ protected:
 	int w, h;
 };
 
-using KeyType = uint8_t;
-namespace keys {
-	extern KeyType
+// We don't have more than 256 useful keys
+using KeyType = uint16_t;
+namespace keys
+{
+	const extern KeyType
 		KEYSTATUS_PRESSED, KEYSTATUS_RELEASED, KEYSTATUS_UNKNOWN;
-	extern KeyType
+	const extern KeyType
 		NYREM_KEY_UNKNOWN, NYREM_KEY_SPACE, NYREM_KEY_APOSTROPHE, NYREM_KEY_COMMA,
 		NYREM_KEY_MINUS, NYREM_KEY_PERIOD, NYREM_KEY_SLASH, NYREM_KEY_0, NYREM_KEY_1,
 		NYREM_KEY_2, NYREM_KEY_3, NYREM_KEY_4, NYREM_KEY_5, NYREM_KEY_6, NYREM_KEY_7,
@@ -83,42 +85,102 @@ namespace keys {
 		NYREM_KEY_KP_SUBTRACT, NYREM_KEY_KP_ADD, NYREM_KEY_KP_ENTER, NYREM_KEY_KP_EQUAL,
 		NYREM_KEY_LEFT_SHIFT, NYREM_KEY_LEFT_CONTROL, NYREM_KEY_LEFT_ALT, NYREM_KEY_LEFT_SUPER,
 		NYREM_KEY_RIGHT_SHIFT, NYREM_KEY_RIGHT_CONTROL, NYREM_KEY_RIGHT_ALT,
-		NYREM_KEY_RIGHT_SUPER, NYREM_KEY_MENU;
+		NYREM_KEY_RIGHT_SUPER, NYREM_KEY_MENU, NYREM_KEY_LAST;
 };
 
+struct KeyEvent {
+	int key, scancode, action, mods;
+};
+struct CharEvent {
+	unsigned int codepoint;
+};
+struct CursorPosEvent {
+	double xpos, ypos;
+};
+struct CursorButtonEvent {
+	int button, action, mods;
+};
+struct CursorScrollEvent {
+	double xoffset, yoffset;
+};
+struct DropEvent {
+	int count;
+	const char **paths;
+};
+
+// This class is responsible for mapping 
 class InputHandler {
 public:
-	using CallbackKey = void(int key, int scancode, int action, int mods);
-	using CallbackChar = void(unsigned int codepoint);
-	using CallbackCursorPos = void(double xpos, double ypos);
-	using CallbackCursorButton = void(int button, int action, int mods);
-	using CallbackCursorScroll = void(double xoffset, double yoffset);
-	using CallbackDrop = void(int count, const char** paths);
+	using CallbackLoopKey = void(KeyEvent);
+	using CallbackSKey = void(KeyEvent);
+	using CallbackKey = void(KeyEvent);
+	using CallbackChar = void(CharEvent);
+	using CallbackCursorPos = void(CursorPosEvent);
+	using CallbackCursorButton = void(CursorButtonEvent);
+	using CallbackCursorScroll = void(CursorScrollEvent);
+	using CallbackDrop = void(DropEvent);
 
+	// <summary>Creates an input handler without any event handlers</summary>
 	InputHandler();
-	int scanCode(KeyType key);
+	// <summary>Creates a copy of the given input handler</summary>
+	InputHandler(const InputHandler &handler);
+	// <summary>Moves the given input handler to *this</summary>
+	InputHandler(InputHandler &&) = default;
 
+	InputHandler& operator=(const InputHandler &handler);
+	InputHandler& operator=(InputHandler &&) = default;
+	~InputHandler() = default;
 
-	/// <summary>Gets a callback reference whenever a key is pressed</summary>
+	int scanCode(KeyType key) const;
+
+	/// <summary>Gets a callback reference whenever a specific key is pressed.
+	/// Callback arguments: void(int scancode, int action, int mods)</summary>
+	/// <returns>Listener object that listens to key presses</returns>
+	Listener<CallbackSKey>& callbackKey(KeyType key);
+	
+	/// <summary>Gets a callback reference whenever a specific key is pressed.
+	/// Callback arguments: void(int key, int scancode, int mods)</summary>
+	/// <returns>Listener object that listens to key presses</returns>
+	Listener<CallbackLoopKey>& loopKey(KeyType key, bool enable=true);
+	
+	void setLoopEnabled(KeyType key, bool val=true);
+	bool isLoopEnabled(KeyType key) const;
+
+	/// <summary>Gets a callback reference whenever a key is pressed.
+	/// Callback arguments: void(int key, int scancode, int action, int mods)</summary>
 	/// <returns>Listener object that listens to key presses</returns>
 	Listener<CallbackKey>& callbackKey();
-	/// <summary>Gets a callback reference whenever a character is written</summary>
+
+
+	/// <summary>Gets a callback reference whenever a character is written.
+	/// Callback arguments: void(unsigned int codepoint)/summary>
 	/// <returns>Listener object that listens to character callbacks</returns>
 	Listener<CallbackChar>& callbackCharacter();
-	/// <summary>Gets a callback reference whenever the cursor position changes</summary>
+
+	/// <summary>Gets a callback reference whenever the cursor position changes
+	/// Callback arguments: void(double xpos, double ypos)</summary>
 	/// <returns>Listener that listens to cursor position updates</returns>
 	Listener<CallbackCursorPos>& callbackCursorPos();
-	/// <summary>Gets a callback reference whenever a cursor button is pressed</summary>
+	Listener<CallbackCursorPos>& loopCursorPos();
+
+	/// <summary>Gets a callback reference whenever a cursor button is pressed.
+	/// Callback arguments: void(int button, int action, int mods)</summary>
 	/// <returns>Listener that listens to cursor button updates</returns>
 	Listener<CallbackCursorButton>& callbackCursorButton();
-	/// <summary>Gets a callback reference whenever the cursor scrolls</summary>
+	Listener<CallbackCursorButton>& loopCursorButton();
+
+	/// <summary>Gets a callback reference whenever the cursor scrolls.
+	/// Callback arguments: void(double xoffset, double yoffset)</summary>
 	/// <returns>Listener that listens to cursor scroll events</returns>
 	Listener<CallbackCursorScroll>& callbackCursorScroll();
-	/// <summary>Gets a callback reference whenever files are drag and dropped</summary>
+	/// <summary>Gets a callback reference whenever files are drag and dropped.
+	/// Callback arguments: void(int count, const char** paths)</summary>
 	/// <returns>Listener that listens to drag and drop events</returns>
 	Listener<CallbackDrop>& callbackDrop();
 
 protected:
+	friend class Engine;
+
 	struct InputHandlerImpl;
 	std::unique_ptr<InputHandlerImpl> k_impl;
 };
@@ -163,19 +225,15 @@ public:
 	Engine& operator=(const Engine&) = delete;
 	Engine& operator=(Engine&& engine);
 
+	void swap(Engine &&engine);
+
 	virtual ~Engine();
+
+	void shouldClose();
 
 	void init(const std::string& name, size_t width, size_t height);
 	void mainloop();
 	void exit();
-
-	virtual void keyCallback(int key, int scancode, int action, int mods) { }
-	virtual void characterCallback(unsigned int codepoint) { }
-	virtual void cursorPositionCallback(double xpos, double ypos) { }
-	virtual void mouseButtonCallback(int button, int action, int mods) { }
-	virtual void scrollCallback(double xoffset, double yoffset) { }
-	virtual void dropCallback(int count, const char** paths) { }
-	virtual void framebufferCallback(int width, int height) { }
 
 	void setPipeline(Renderable* pipeline);
 	void setPreRender(std::function<void()>&& func);
@@ -187,10 +245,20 @@ public:
 
 	InputHandler& input();
 
+public:
+	virtual void keyCallback(int key, int scancode, int action, int mods);
+	virtual void characterCallback(unsigned int codepoint);
+	virtual void cursorPositionCallback(double xpos, double ypos);
+	virtual void mouseButtonCallback(int button, int action, int mods);
+	virtual void scrollCallback(double xoffset, double yoffset);
+	virtual void dropCallback(int count, const char** paths);
+	virtual void framebufferCallback(int width, int height);
+
 protected:
 	struct EngineImpl; // Engine implementation type
 	std::unique_ptr<EngineImpl> k_impl;
 };
-}
+
+} // !nyrem
 
 #endif // !NYREM_WINDOW_HPP

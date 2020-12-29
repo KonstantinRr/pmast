@@ -40,12 +40,30 @@
 #include <unordered_map>
 
 namespace nyrem {
+
+	class RenderContext {
+		size_t w, h;
+		float s;
+	public:
+		RenderContext() = default;
+		RenderContext(size_t w, size_t h, float s);
+
+		inline size_t width() const { return w; }
+		inline size_t height() const { return h; }
+		inline float scale() const { return s; }
+	};
+
 	/// <summary>
 	/// A general interface that defines the capability of rendering objects.
 	/// </summary>
 	class Renderable {
 	public:
-		virtual void render() = 0;
+		virtual void render(const RenderContext &context);
+		void storeContext(const RenderContext &context);
+
+		virtual ~Renderable() = default;
+	protected:
+		RenderContext context;
 	};
 
 
@@ -59,12 +77,16 @@ namespace nyrem {
 		/// <summary>The OpenGL program ID that is generated</summary>
 		GLuint program;
 
-		/// <summary> Whether this shader contains a vertex unit. All OpenGL pipelines require a Vertex shader.
-		/// This argument must therefore be true. </summary>
-		bool hasVertexShader;
-		/// <summary> Whether this shader contains a fragment unit. All OpenGL pipelines require a fragment shader.
-		/// This argument must therefore be true. </summary>
-		bool hasFragmentShader;
+		using bit_t = uint8_t;
+		static const bit_t
+			BIT_HAS_VERT_SHADER = 0b000001,
+			BIT_HAS_FRAG_SHADER = 0b000010,
+			BIT_CREATED_PROG 	= 0b000100,
+			BIT_CREATED_VERT 	= 0b001000,
+			BIT_CREATED_FRAG 	= 0b010000,
+			BIT_LINKED 			= 0b100000;
+
+		bit_t flags = 0;
 
 		/// Private cleanup function taking care of freeing all allocated OpenGL shader resources.
 
@@ -75,6 +97,7 @@ namespace nyrem {
 			GLuint vertex_shader,
 			GLuint fragment_shader);
 
+		void cleanupProgram();
 	public:
 		/// Initializes a new shader unit with the given specs.
 		/// This does not create the shader yet.
@@ -103,6 +126,7 @@ namespace nyrem {
 		/// Releases the OpenGL shader process.
 		void bind();
 		void release();
+		bool valid();
 
 		//---- Loading to Shaders ----//
 
@@ -129,7 +153,7 @@ namespace nyrem {
 
 		/// Returns the uniform location that is bound
 		/// by this name. Returns -1 if the name was not found
-		GLint uniformLocation(const std::string& name);
+		GLint uniformLocation(const std::string& name, bool required=true);
 
 		/// Returns the shader program ID
 		GLuint getShaderID();
@@ -188,7 +212,7 @@ namespace nyrem {
 
 		/// <summary>Implementation of the Renderable interface. Forwards the call to the ShaderBase using the
 		/// StageBuffer object as argument. </summary>
-		virtual void render() { shader->render(vStageBuffer); }
+		virtual void render(const RenderContext &context) override { shader->render(vStageBuffer); }
 	};
 
 	/// <summary>
@@ -213,7 +237,7 @@ namespace nyrem {
 		void clear();
 
 		/// <summary>Renders the pipeline by invoking all child pipelines. </summary>
-		void render();
+		void render(const RenderContext &context) override;
 	};
 
 	//---- RenderUtilities ----//
