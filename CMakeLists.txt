@@ -102,6 +102,7 @@ set(ENGINE_SOURCES # All source files in the ENGINE project
   "${CMAKE_CURRENT_SOURCE_DIR}/src/engine/window.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/engine/thread.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/engine/internal.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/engine/util.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/ext/glad/src/glad.c")
 set(ENGINE_HEADERS # All header files in the ENGINE project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/camera.hpp"
@@ -114,6 +115,7 @@ set(ENGINE_HEADERS # All header files in the ENGINE project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/graphics.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/window.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/thread.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/util.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/listener.hpp")
 set(ENGINE_INCLUDE # All include files in the ENGINE project
   "${CMAKE_CURRENT_SOURCE_DIR}/include"

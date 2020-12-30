@@ -53,16 +53,18 @@ namespace traffic
 	struct FastGraphEdge {
 		size_t goal;
 		prec_t weight;
-		std::vector<int64_t> optimized;
 
 		FastGraphEdge() = default;
 		FastGraphEdge(size_t goal, prec_t weight);
 	};
 
 	struct FastGraphNode {
-		int64_t nodeID;
-		prec_t lat, lon;
+		// stores all connections to other nodes
 		std::vector<FastGraphEdge> connections;
+		// stores the OSM ID for this graph node
+		int64_t nodeID;
+		// stores the coordinates of this graph node
+		prec_t lat, lon;
 
 		FastGraphNode() = default;
 		FastGraphNode(int64_t nodeID, prec_t lat, prec_t lon);
@@ -86,7 +88,7 @@ namespace traffic
 	/// cost may be calculated by different method but may never be negative. This
 	/// may lead to unexpected consequences.
 	/// </summary>
-	class GraphEdge : public SizeObject
+	class GraphEdge
 	{ 
 	public:
 		/// <summary>Creates an edge of a graph</summary>
@@ -95,11 +97,16 @@ namespace traffic
 		/// <returns></returns>
 		GraphEdge(int64_t goalID, prec_t weight);
 
-		virtual size_t getSize() const;
-
+		// ---- Size access members ---- //
+		inline bool hasManagedSize() const { return false; }
+		inline size_t getManagedSize() const { return 0; }
+		inline size_t getSize() const { return sizeof(*this); }
 	public:
 		// ---- Member definitions ---- //
+
+		// stores the goal ID
 		int64_t goal;
+		// stores the weight
 		prec_t weight;
 	};
 
@@ -115,13 +122,13 @@ namespace traffic
 		/// <returns></returns>
 		GraphNode(const OSMNode &node);
 
-		virtual bool hasManagedSize() const;
-		virtual size_t getManagedSize() const;
-		virtual size_t getSize() const;
+		inline bool hasManagedSize() const { return true; }
+		inline size_t getManagedSize() const { return getSizeOfObjects(connections); }
+		inline size_t getSize() const { return sizeof(*this) + getManagedSize();}
 
-		glm::vec2 getPosition() const;
-		prec_t getLatitude() const;
-		prec_t getLongitude() const;
+		inline glm::vec2 getPosition() const { return glm::vec2(lat, lon); }
+		inline prec_t getLatitude() const { return lat; }
+		inline prec_t getLongitude() const { return lon; }
 
 		// ---- Member definitions ---- //
 		prec_t lat, lon;
@@ -138,8 +145,8 @@ namespace traffic
 	{
 		Route() = default;
 
-		bool exists() const;
-		void addNode(int64_t nodeID);
+		inline bool exists() const { return !nodes.empty(); }
+		inline void addNode(int64_t nodeID) { nodes.push_back(nodeID); }
 
 		// ---- Member definitions ---- //
 		std::vector<int64_t> nodes;
@@ -195,28 +202,26 @@ namespace traffic
 
 		graphmap_t& getMap();
 		std::vector<GraphNode>& getBuffer();
-		std::shared_ptr<OSMSegment> getXMLMap();
 
 		const graphmap_t& getMap() const;
 		const std::vector<GraphNode>& getBuffer() const;
-		std::shared_ptr<const OSMSegment> getXMLMap() const;
 
 		size_t countNodes() const;
 		size_t countEdges() const;
 		void clear();
 
-		bool checkConsistency() const;
+		bool checkConsistency(const OSMSegment& seg) const;
 
 		virtual bool hasManagedSize() const;
 		virtual size_t getManagedSize() const;
 		virtual size_t getSize() const;
 
 	protected:
+		//
 		std::vector<GraphNode> graphBuffer;
 		graphmap_t graphMap;
 
 		std::unique_ptr<FastGraph> fastGraph;
-		std::shared_ptr<OSMSegment> xmlmap;
 	};
 }
 

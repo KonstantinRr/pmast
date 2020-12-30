@@ -240,7 +240,7 @@ int main(int argc, char** argv)
 			for (int64_t id : r.nodes) {
 				std::cout << "Node: " << id << "\n";
 			}
-			m_canvas->loadRoute(r, graph->getXMLMap());
+			m_canvas->loadRoute(r, world->getHighwayMap());
 		}
 	});
 

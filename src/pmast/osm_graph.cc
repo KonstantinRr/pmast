@@ -28,6 +28,8 @@
 #include <pmast/osm_mesh.hpp>
 #include <pmast/osm_graph.hpp>
 
+#include <engine/util.hpp>
+
 #include <chrono>
 #include <limits>
 #include <queue>
@@ -73,54 +75,29 @@ BufferedNode<ParentType>::BufferedNode(
 using BufferedGraphNode = BufferedNode<GraphNode>;
 using BufferedFastNode = BufferedNode<FastGraphNode>;
 
-// ---- GraphNode ---- //
-
-GraphNode::GraphNode(const OSMNode &node)
-{
-	this->lat = node.getLat();
-	this->lon = node.getLon();
-	this->nodeID = node.getID();
-}
-
-bool traffic::GraphNode::hasManagedSize() const { return true; }
-size_t traffic::GraphNode::getManagedSize() const
-{
-	return getSizeOfObjects(connections);
-}
-
-size_t traffic::GraphNode::getSize() const
-{
-	return sizeof(*this) + getManagedSize();
-}
-
-vec2 GraphNode::getPosition() const { return vec2(lat, lon); }
-prec_t GraphNode::getLatitude() const { return lat; }
-prec_t GraphNode::getLongitude() const { return lon; }
-
 // ---- GraphEdge ---- //
 
-GraphEdge::GraphEdge(int64_t pGoalID, prec_t pWeight) {
-	this->goal = pGoalID;
-	this->weight = pWeight;
+GraphEdge::GraphEdge(int64_t pGoalID, prec_t pWeight) :
+	goal(pGoalID),
+	weight(pWeight)
+{
+
 }
 
-size_t traffic::GraphEdge::getSize() const { return sizeof(*this); }
+// ---- GraphNode ---- //
 
-// ---- Route ---- //
+GraphNode::GraphNode(const OSMNode &node) :
+	lat(node.getLat()),
+	lon(node.getLon()),
+	nodeID(node.getID())
+{
 
-bool Route::exists() const {
-	return !nodes.empty();
-}
-
-void Route::addNode(int64_t nodeID) {
-	nodes.push_back(nodeID);
 }
 
 // ---- Graph ---- //
 
 Graph::Graph(const shared_ptr<OSMSegment>& xmlmap)
 {
-	this->xmlmap = xmlmap;
 	// Iterates throught the whole list of ways, and nodes for each way. The algorithm checks
 	// constantly if the node already exists in the map. It connects the nodes by creating
 	// a new edge.
@@ -301,11 +278,8 @@ GraphNode& traffic::Graph::findClosestNode(const Point &p)
 
 graphmap_t& Graph::getMap() { return graphMap; }
 std::vector<GraphNode>& Graph::getBuffer() { return graphBuffer; }
-std::shared_ptr<OSMSegment> Graph::getXMLMap() { return xmlmap; }
-
 const graphmap_t& Graph::getMap() const { return graphMap; }
 const std::vector<GraphNode>& Graph::getBuffer() const { return graphBuffer; }
-std::shared_ptr<const OSMSegment> Graph::getXMLMap() const { return xmlmap; }
 
 size_t Graph::countNodes() const {
 	return graphBuffer.size();
@@ -324,34 +298,40 @@ void Graph::clear() {
 	graphMap.clear();
 }
 
-bool Graph::checkConsistency() const {
-	printf("Checking graph consistency: %d Nodes\n", graphBuffer.size());
+bool Graph::checkConsistency(const OSMSegment& seg) const {
+	nyrem::FastSStream stream;
 
 	// Counting edges
 	size_t sum = 0;
 	for (auto &node : graphBuffer)
 		sum += node.connections.size();
-	printf("Edges: %d\n", sum);
 
+	stream.add(fmt::format(
+		"Checking graph consistency: {} Nodes, {} Edges\n",
+		graphBuffer.size(), sum));
 	
 	// checking buffer consistency
 	bool check = true;
 	for (size_t i = 0; i < graphBuffer.size(); i++) {
 		auto checkIndex = graphMap.find(graphBuffer[i].nodeID);
 		if (checkIndex == graphMap.end()) {
-			printf("Could not find nodeID in map. INDEX: %d ID: %d\n",
-				i, graphBuffer[i].nodeID);
+			stream.add(fmt::format(
+				"Could not find nodeID in map. INDEX: {} ID: {}\n",
+				i, graphBuffer[i].nodeID));
 			check = false;
 			continue;
 		}
 		if (checkIndex->second != i) {
-			printf("Map index does not match buffer index. Buffer: %d Map: %d\n",
-				i, checkIndex->second);
+			stream.add(fmt::format(
+				"Map index does not match buffer index. Buffer: {} Map: {}\n",
+				i, checkIndex->second));
 			check = false;
 			continue;
 		}
-		if (xmlmap->hasNodeIndex(checkIndex->second)) {
-			printf("OSMNode does not exist in OSMSegment: %d\n", checkIndex->second);
+		if (seg.hasNodeIndex(checkIndex->second)) {
+			stream.add(fmt::format(
+				"OSMNode does not exist in OSMSegment: {}\n",
+				checkIndex->second));
 			check = false;
 			continue;
 		}
@@ -360,8 +340,9 @@ bool Graph::checkConsistency() const {
 		for (size_t k = 0; k < graphBuffer[i].connections.size(); k++) {
 			auto connCheck = graphMap.find(graphBuffer[i].connections[k].goal);
 			if (connCheck == graphMap.end()) {
-				printf("Connection NodeID is not part of NodeMap. ID: %d\n",
-					graphBuffer[i].connections[k].goal);
+				stream.add(fmt::format(
+					"Connection NodeID is not part of NodeMap. ID: {}\n",
+					graphBuffer[i].connections[k].goal));
 				check = false;
 				continue;
 			}
@@ -372,13 +353,14 @@ bool Graph::checkConsistency() const {
 	for (auto& it: graphMap) {
 		// Do stuff
 		if (it.second >= graphBuffer.size()) {
-			printf("GraphMap value out of range %d\n", it.second);
+			stream.add(fmt::format("GraphMap value out of range {}\n", it.second));
 			check = false;
 			continue;
 		}
 	}
 
-	printf("Graph consistency check computed %d\n", check);
+	stream.add(fmt::format("Graph consistency check computed {}\n", check));
+	spdlog::info(stream.generate());
 	return true;
 }
 

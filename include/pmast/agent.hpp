@@ -46,8 +46,7 @@ namespace traffic
     /// has its own set of believes desires and goals that it tries to achieve. Agents
     /// are generally selfish meaning they always want the best outcome for themselves.
     /// </summary>
-    class Agent
-    {
+    class Agent {
     public:
         // ---- Constructors ---- //
         Agent(const Agent&) = delete;
