@@ -47,27 +47,28 @@ namespace traffic
 	struct Route; // Defines a route between two graph nodes
 	class Graph; // Combines a list of GraphNodes in a network by GraphEdges
 	
-	struct FastGraphEdge;
-	struct FastGraphNode;
+	struct TrafficGraphEdge;
+	struct TrafficGraphNode;
 
-	struct FastGraphEdge {
+	struct TrafficGraphEdge {
+	public:
 		size_t goal;
 		prec_t weight;
-
-		FastGraphEdge() = default;
-		FastGraphEdge(size_t goal, prec_t weight);
+	public:
+		TrafficGraphEdge() = default;
+		TrafficGraphEdge(size_t goal, prec_t weight);
 	};
 
-	struct FastGraphNode {
+	struct TrafficGraphNode {
 		// stores all connections to other nodes
-		std::vector<FastGraphEdge> connections;
+		std::vector<TrafficGraphEdge> connections;
 		// stores the OSM ID for this graph node
 		int64_t nodeID;
 		// stores the coordinates of this graph node
 		prec_t lat, lon;
 
-		FastGraphNode() = default;
-		FastGraphNode(int64_t nodeID, prec_t lat, prec_t lon);
+		TrafficGraphNode() = default;
+		TrafficGraphNode(int64_t nodeID, prec_t lat, prec_t lon);
 	};
 
 	class FastGraph {
@@ -77,9 +78,8 @@ namespace traffic
 		Route findRoute(size_t start, size_t goal);
 
 	protected:
-		std::vector<FastGraphNode> graphBuffer;
+		std::vector<TrafficGraphNode> graphBuffer;
 	};
-
 
 	/// <summary>
 	/// Graph edges are used to connect GraphNodes with each other. The implemented
@@ -117,6 +117,7 @@ namespace traffic
 	/// </summary>
 	struct GraphNode
 	{
+	public:
 		/// <summary> Creates a GraphNode from a regular OSM node</summary>
 		/// <param name="node">A regular OSM node</param>
 		/// <returns></returns>
@@ -129,7 +130,7 @@ namespace traffic
 		inline glm::vec2 getPosition() const { return glm::vec2(lat, lon); }
 		inline prec_t getLatitude() const { return lat; }
 		inline prec_t getLongitude() const { return lon; }
-
+	public:
 		// ---- Member definitions ---- //
 		prec_t lat, lon;
 		int64_t nodeID;
@@ -168,8 +169,6 @@ namespace traffic
 		/// <returns></returns>
 		Graph(const std::shared_ptr<OSMSegment> &xmlmap);
 
-		virtual ~Graph() = default;
-
 		void optimize();
 
 		/// <summary>Applies the AStar (A*) path finding algorithm on the graph</summary>
@@ -200,11 +199,11 @@ namespace traffic
 
 		// ---- Getter functions ---- //
 
-		graphmap_t& getMap();
-		std::vector<GraphNode>& getBuffer();
+		graphmap_t& getMap() { return graphMap; }
+		const graphmap_t& getMap() const { return graphMap; }
 
-		const graphmap_t& getMap() const;
-		const std::vector<GraphNode>& getBuffer() const;
+		std::vector<GraphNode>& getBuffer() { return graphBuffer; }
+		const std::vector<GraphNode>& getBuffer() const { return graphBuffer; }
 
 		size_t countNodes() const;
 		size_t countEdges() const;
@@ -212,12 +211,11 @@ namespace traffic
 
 		bool checkConsistency(const OSMSegment& seg) const;
 
-		virtual bool hasManagedSize() const;
-		virtual size_t getManagedSize() const;
-		virtual size_t getSize() const;
+		inline bool hasManagedSize() const { return true; }
+		size_t getManagedSize() const;
+		inline size_t getSize() const { return sizeof(*this) + getManagedSize(); }
 
 	protected:
-		//
 		std::vector<GraphNode> graphBuffer;
 		graphmap_t graphMap;
 

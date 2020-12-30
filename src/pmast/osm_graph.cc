@@ -73,7 +73,7 @@ BufferedNode<ParentType>::BufferedNode(
 }
 
 using BufferedGraphNode = BufferedNode<GraphNode>;
-using BufferedFastNode = BufferedNode<FastGraphNode>;
+using BufferedFastNode = BufferedNode<TrafficGraphNode>;
 
 // ---- GraphEdge ---- //
 
@@ -102,11 +102,12 @@ Graph::Graph(const shared_ptr<OSMSegment>& xmlmap)
 	// constantly if the node already exists in the map. It connects the nodes by creating
 	// a new edge.
 
-	for (const OSMWay& way : (*xmlmap->getWays()))
+	for (const OSMWay& way : *xmlmap->getWays()
+	)
 	{
 		int64_t lastID = -1;
 
-		for (const int64_t& currentID : way.getNodes())
+		for (int64_t currentID : way.getNodes())
 		{
 			// Checks whether the ID was found before
 			auto indexIt = graphMap.find(currentID);
@@ -157,101 +158,24 @@ Route Graph::findRoute(int64_t start, int64_t goal)
 {
 	int64_t startIndex = findNodeIndex(start);
 	int64_t stopIndex = findNodeIndex(goal);
-	if (startIndex == -1 || stopIndex == -1) {
-		printf("Could not find start/goal indices\n");
-		return Route();
-	}
+	if (startIndex == -1 || stopIndex == -1)
+		throw std::runtime_error("Could not find start/goal indices\n");
 
-	if (startIndex == stopIndex)
-		return Route();
-
-	if (fastGraph) {
+	if (fastGraph)
 		return fastGraph->findRoute(startIndex, stopIndex);
-	}
-
-	// Initializes the buffered data using an empty list
-	size_t nodeCount = graphBuffer.size();
-	vector<BufferedGraphNode> nodes(nodeCount);
-	for (size_t i = 0; i < nodeCount; i++) {
-		nodes[i].distance = std::numeric_limits<double>::max();
-		nodes[i].visited = false;
-		nodes[i].previous = nullptr;
-		nodes[i].node = &(graphBuffer[i]);
-	}
-
-	// defines the min priority queue
-	auto cmp = [](const BufferedGraphNode* left, const BufferedGraphNode* right)
-		{ return left->distance > right->distance; };
-	priority_queue<BufferedGraphNode*,
-		vector<BufferedGraphNode*>, decltype(cmp)> queue(cmp);
-
-	//size_t startIndex = graphMap[start];
-	nodes[startIndex].distance = 0;
-	queue.push(&(nodes[startIndex]));
-
-	while (true)
-	{
-		// All possible connections where searched and the goal was not found.
-		// This means that there is not a possible way to reach the destination node.
-		if (queue.empty())
-			return Route();
-
-		// Takes the first element
-		BufferedGraphNode* currentNode = queue.top();
-		queue.pop();
-
-
-		// Checks the goal condition. Starts the backpropagation
-		// algorithm if the goal was found to output the shortest
-		// route.
-		if (currentNode->node->nodeID == goal)
-		{
-			Route route;
-			do {
-				route.addNode(currentNode->node->nodeID);
-				currentNode = currentNode->previous;
-			} while (currentNode->node->nodeID != start);
-			return route;
-		}
-
-		auto& connections = currentNode->node->connections;
-		for (size_t i = 0; i < connections.size(); i++)
-		{
-			size_t nodeIndex = graphMap[connections[i].goal];
-
-			// Checks if the node was already visited
-			BufferedGraphNode* nextNode = &(nodes[nodeIndex]);
-			if (nextNode->visited) continue;
-
-			// Updates the distance
-			prec_t newDistance = currentNode->distance
-				+ connections[i].weight;
-			if (newDistance < nextNode->distance)
-			{
-				nextNode->distance = newDistance;
-				nextNode->previous = currentNode;
-			}
-
-			// Adds the node to the list of nodes that need to
-			// be visited. The node will be visited in one of the
-			// next iterations
-			queue.push(nextNode);
-		}
-
-		currentNode->visited = true;
-	}
+	return Route();
 }
 
 GraphNode& Graph::findNodeByIndex(size_t index) { return graphBuffer[index]; }
 GraphNode& Graph::findNodeByID(int64_t id) {
 	int64_t index = findNodeIndex(id);
-	if (index == -1) throw "Could not find node ID";
+	if (index == -1) throw std::runtime_error("Could not find node ID");
 	return graphBuffer[static_cast<size_t>(index)];
 }
 const GraphNode& Graph::findNodeByIndex(size_t index) const { return graphBuffer[index]; }
 const GraphNode& Graph::findNodeByID(int64_t id) const {
 	int64_t index = findNodeIndex(id);
-	if (index == -1) throw "Could not find node ID";
+	if (index == -1) throw std::runtime_error("Could not find node ID");
 	return graphBuffer[static_cast<size_t>(index)];
 }
 
@@ -262,12 +186,14 @@ int64_t Graph::findNodeIndex(int64_t id) const {
 
 GraphNode& traffic::Graph::findClosestNode(const Point &p)
 {
+	if (graphBuffer.empty())
+		throw std::runtime_error("Could not find Node; Graph is empty");
+
 	size_t bestIndex = 0;
 	double bestDistance = std::numeric_limits<double>::max();
 	for (size_t i = 0; i < graphBuffer.size(); i++) {
 		double newDistance = traffic::distance(
 			graphBuffer[i].getPosition(), p.toVec());
-		//printf("Distance = %f %f %f\n", newDistance, graphBuffer[i].getLatitude(), graphBuffer[i].getLongitude());
 		if (newDistance < bestDistance) {
 			bestIndex = i;
 			bestDistance = newDistance;
@@ -276,19 +202,13 @@ GraphNode& traffic::Graph::findClosestNode(const Point &p)
 	return graphBuffer[bestIndex];
 }
 
-graphmap_t& Graph::getMap() { return graphMap; }
-std::vector<GraphNode>& Graph::getBuffer() { return graphBuffer; }
-const graphmap_t& Graph::getMap() const { return graphMap; }
-const std::vector<GraphNode>& Graph::getBuffer() const { return graphBuffer; }
-
 size_t Graph::countNodes() const {
 	return graphBuffer.size();
 }
 
 size_t Graph::countEdges() const {
-	// Counting edges
 	size_t sum = 0;
-	for (auto& node : graphBuffer)
+	for (const auto &node : graphBuffer)
 		sum += node.connections.size();
 	return sum;
 }
@@ -298,22 +218,18 @@ void Graph::clear() {
 	graphMap.clear();
 }
 
+// checking buffer consistency
 bool Graph::checkConsistency(const OSMSegment& seg) const {
 	nyrem::FastSStream stream;
 
-	// Counting edges
-	size_t sum = 0;
-	for (auto &node : graphBuffer)
-		sum += node.connections.size();
-
 	stream.add(fmt::format(
 		"Checking graph consistency: {} Nodes, {} Edges\n",
-		graphBuffer.size(), sum));
-	
-	// checking buffer consistency
-	bool check = true;
+		countNodes(), countEdges()));
+
+	bool check = true; // buffer is consistent
 	for (size_t i = 0; i < graphBuffer.size(); i++) {
 		auto checkIndex = graphMap.find(graphBuffer[i].nodeID);
+		// checks whether the node is registered in the graph map
 		if (checkIndex == graphMap.end()) {
 			stream.add(fmt::format(
 				"Could not find nodeID in map. INDEX: {} ID: {}\n",
@@ -321,6 +237,7 @@ bool Graph::checkConsistency(const OSMSegment& seg) const {
 			check = false;
 			continue;
 		}
+		// checks whether both indices match
 		if (checkIndex->second != i) {
 			stream.add(fmt::format(
 				"Map index does not match buffer index. Buffer: {} Map: {}\n",
@@ -328,6 +245,7 @@ bool Graph::checkConsistency(const OSMSegment& seg) const {
 			check = false;
 			continue;
 		}
+		// checks whether the node is in the original map
 		if (seg.hasNodeIndex(checkIndex->second)) {
 			stream.add(fmt::format(
 				"OSMNode does not exist in OSMSegment: {}\n",
@@ -336,7 +254,7 @@ bool Graph::checkConsistency(const OSMSegment& seg) const {
 			continue;
 		}
 
-		// Check the connections
+		// Check if all the connections exists in the graph map
 		for (size_t k = 0; k < graphBuffer[i].connections.size(); k++) {
 			auto connCheck = graphMap.find(graphBuffer[i].connections[k].goal);
 			if (connCheck == graphMap.end()) {
@@ -349,9 +267,8 @@ bool Graph::checkConsistency(const OSMSegment& seg) const {
 		}
 	}
 
-	// checking map consistency
+	// checks the map conistency range
 	for (auto& it: graphMap) {
-		// Do stuff
 		if (it.second >= graphBuffer.size()) {
 			stream.add(fmt::format("GraphMap value out of range {}\n", it.second));
 			check = false;
@@ -364,16 +281,11 @@ bool Graph::checkConsistency(const OSMSegment& seg) const {
 	return true;
 }
 
-bool traffic::Graph::hasManagedSize() const { return true; }
 size_t traffic::Graph::getManagedSize() const
 {
 	return getSizeOfObjects(graphBuffer);
 }
 
-size_t traffic::Graph::getSize() const
-{
-	return size_t();
-}
 
 FastGraph::FastGraph(const Graph& graph)
 {
@@ -382,17 +294,17 @@ FastGraph::FastGraph(const Graph& graph)
 	graphBuffer.resize(buf.size());
 	
 	for (size_t i = 0; i < buf.size(); i++) {
-		FastGraphNode node(buf[i].nodeID, buf[i].lat, buf[i].lon);
+		TrafficGraphNode node(buf[i].nodeID, buf[i].lat, buf[i].lon);
 		for (size_t k = 0; k < buf[i].connections.size(); k++) {
 			node.connections.resize(buf[i].connections.size());
 
 			int64_t goalIndex = graph.findNodeIndex(buf[i].connections[k].goal);
 			if (goalIndex == -1) {
-				printf("Could not find goalIndex!");
+				spdlog::warn("FastGraph Creation: Could not find GoalIndex!");
 				continue;
 			}
 
-			node.connections[k] = FastGraphEdge(
+			node.connections[k] = TrafficGraphEdge(
 				static_cast<size_t>(goalIndex),
 				buf[i].connections[k].weight
 			);
@@ -404,6 +316,9 @@ FastGraph::FastGraph(const Graph& graph)
 Route traffic::FastGraph::findRoute(size_t start, size_t goal)
 {
 	auto begin = std::chrono::steady_clock::now();
+
+	if (start == goal)
+		return Route();
 
 	// Initializes the buffered data using an empty list
 	size_t nodeCount = graphBuffer.size();
@@ -451,8 +366,8 @@ Route traffic::FastGraph::findRoute(size_t start, size_t goal)
 			} while (currentNode->node->nodeID != graphBuffer[start].nodeID);
 
 			auto end = std::chrono::steady_clock::now();
-			std::cout << "Time difference = " << std::chrono::duration_cast<
-				std::chrono::nanoseconds>(end - begin).count() << "[ns]" << std::endl;
+			spdlog::info("Found path in {}[us]", std::chrono::duration_cast<
+				std::chrono::microseconds>(end - begin).count());
 			return route;
 		}
 
@@ -467,19 +382,28 @@ Route traffic::FastGraph::findRoute(size_t start, size_t goal)
 					nextNode->distance = newDistance;
 					nextNode->previous = currentNode;
 				}
-
 				// Adds the node to the list of nodes that need to be visited.
 				// The node will be visited in one of the next iterations
 				queue.push(nextNode);
 			}
 		}
-
+		// marks the node finally as being visited
 		currentNode->visited = true;
 	}
 }
 
-FastGraphEdge::FastGraphEdge(size_t goal, prec_t weight)
-	: goal(goal), weight(weight) { }
+// ---- TrafficGraphEdge ---- //
 
-FastGraphNode::FastGraphNode(int64_t nodeID, prec_t lat, prec_t lon)
-	: nodeID(nodeID), lat(lat), lon(lon) { }
+TrafficGraphEdge::TrafficGraphEdge(size_t goal, prec_t weight)
+	: goal(goal), weight(weight)
+{
+
+}
+
+// ---- TrafficGraphNode ---- //
+
+TrafficGraphNode::TrafficGraphNode(int64_t nodeID, prec_t lat, prec_t lon)
+	: nodeID(nodeID), lat(lat), lon(lon)
+{
+
+}
