@@ -30,7 +30,6 @@ AtomicLock::AtomicLock(bool doLock) {
 }
 
 void AtomicLock::lock() noexcept {
-	this->doLock = doLock;
 	if (doLock) {
 		for (;;) {
 			// Optimistically assume the lock is free on first the try

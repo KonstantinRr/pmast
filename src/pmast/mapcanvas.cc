@@ -26,6 +26,7 @@
 #include <pmast/mapcanvas.hpp>
 #include <pmast/engine.hpp>
 #include <pmast/osm_mesh.hpp>
+#include <pmast/osm_graph.hpp>
 
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtx/rotate_vector.hpp>

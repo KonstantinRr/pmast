@@ -31,15 +31,19 @@
 #include "engine.hpp"
 #include <engine/thread.hpp>
 
-
-#include "osm.hpp"
-#include "osm_graph.hpp"
-#include "geom.hpp"
+#include <string>
+#include <memory>
 
 namespace traffic
 {
     class Agent; // A single agent that takes part in the world
     class World; // The world the agent takes part of
+
+    class OSMSegment;   // externally defined
+    class Graph;        // externally defined
+    class TrafficGraphEdge; // externally defined
+    class TrafficGraphNode; // externally defined
+    class TrafficGraph;     // externally defined
 
     /// <summary>
     /// Agents are entities that act in the world to achieve a certain goal. Each agent
@@ -55,23 +59,25 @@ namespace traffic
         Agent& operator=(const Agent&) = delete;
         Agent& operator=(Agent&&) = delete;
 
-        virtual ~Agent() = default;
+        ~Agent() = default;
 
         // ---- Functions ---- //
 
         void setGoal(int64_t newGoal);
         int64_t getGoal() const;
 
-        virtual void update();
+        void update(double dt);
         void makeGreedyChoice();
+        TrafficGraphEdge* edge();
 
     protected:
         // ---- Member definitions ---- //
         std::shared_ptr<World> world;
-        int64_t goalID;
+        TrafficGraphEdge* m_edge;
+        size_t m_begin;
+        size_t m_end;
 
-        int64_t lastVisited;
-        int64_t nextVisited;
+        int64_t goalID;
     };
 
 

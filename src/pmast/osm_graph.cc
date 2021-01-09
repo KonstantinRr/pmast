@@ -75,6 +75,22 @@ BufferedNode<ParentType>::BufferedNode(
 using BufferedGraphNode = BufferedNode<GraphNode>;
 using BufferedFastNode = BufferedNode<TrafficGraphNode>;
 
+// ---- TrafficGraphEdge ---- //
+
+TrafficGraphEdge::TrafficGraphEdge(size_t goal, prec_t weight)
+	: goal(goal), weight(weight)
+{
+
+}
+
+// ---- TrafficGraphNode ---- //
+
+TrafficGraphNode::TrafficGraphNode(int64_t nodeID, prec_t x, prec_t y)
+	: nodeID(nodeID), x(x), y(y)
+{
+
+}
+
 // ---- GraphEdge ---- //
 
 GraphEdge::GraphEdge(int64_t pGoalID, prec_t pWeight) :
@@ -149,9 +165,9 @@ Graph::Graph(const shared_ptr<OSMSegment>& xmlmap)
 	}
 }
 
-void traffic::Graph::optimize()
+void Graph::optimize()
 {
-	fastGraph = std::make_unique<FastGraph>(*this);
+	fastGraph = std::make_unique<TrafficGraph>(*this);
 }
 
 Route Graph::findRoute(int64_t start, int64_t goal)
@@ -287,7 +303,7 @@ size_t traffic::Graph::getManagedSize() const
 }
 
 
-FastGraph::FastGraph(const Graph& graph)
+TrafficGraph::TrafficGraph(const Graph& graph)
 {
 	const std::vector<GraphNode> &buf = graph.getBuffer();
 	// reserves the needed capacity
@@ -313,8 +329,9 @@ FastGraph::FastGraph(const Graph& graph)
 	}
 }
 
-Route traffic::FastGraph::findRoute(size_t start, size_t goal)
+Route TrafficGraph::findRoute(size_t start, size_t goal)
 {
+	prec_t maxDistanceScale = 3.0f;
 	auto begin = std::chrono::steady_clock::now();
 
 	if (start == goal)
@@ -329,8 +346,8 @@ Route traffic::FastGraph::findRoute(size_t start, size_t goal)
 		nodes[i].previous = nullptr;
 		nodes[i].node = &(graphBuffer[i]);
 		nodes[i].heuristic = simpleDistance(
-			glm::dvec2(graphBuffer[i].lat, graphBuffer[i].lon),
-			glm::dvec2(graphBuffer[goal].lat, graphBuffer[goal].lon));
+			glm::dvec2(graphBuffer[i].x, graphBuffer[i].y),
+			glm::dvec2(graphBuffer[goal].x, graphBuffer[goal].y));
 	}
 
 	// Defines a min priority queue
@@ -339,7 +356,7 @@ Route traffic::FastGraph::findRoute(size_t start, size_t goal)
 	priority_queue<BufferedFastNode*, vector<BufferedFastNode*>,
 		decltype(cmp)> queue(cmp);
 
-	prec_t maxDistance = nodes[start].heuristic * 3;
+	prec_t maxDistance = nodes[start].heuristic * maxDistanceScale;
 	// Adds the starting node to the queue.
 	nodes[start].distance = 0;
 	queue.push(&(nodes[start]));
@@ -390,20 +407,4 @@ Route traffic::FastGraph::findRoute(size_t start, size_t goal)
 		// marks the node finally as being visited
 		currentNode->visited = true;
 	}
-}
-
-// ---- TrafficGraphEdge ---- //
-
-TrafficGraphEdge::TrafficGraphEdge(size_t goal, prec_t weight)
-	: goal(goal), weight(weight)
-{
-
-}
-
-// ---- TrafficGraphNode ---- //
-
-TrafficGraphNode::TrafficGraphNode(int64_t nodeID, prec_t lat, prec_t lon)
-	: nodeID(nodeID), lat(lat), lon(lon)
-{
-
 }

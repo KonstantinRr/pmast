@@ -36,47 +36,55 @@
 #include <glm/glm.hpp>
 
 #include "osm.hpp"
+#include <pmast/agent.hpp>
 
 using graphmap_t = robin_hood::unordered_node_map<int64_t, size_t>;
 
 namespace traffic
 {
-    /* Graph Representation */
-	struct GraphEdge; // A single edge that is part of a larger graph
-	struct GraphNode; // A node that is part of a larger graph
-	struct Route; // Defines a route between two graph nodes
-	class Graph; // Combines a list of GraphNodes in a network by GraphEdges
+    // ---- Graph Representation ---- //
+	struct GraphEdge; 	// A single edge that is part of a larger graph
+	struct GraphNode; 	// A node that is part of a larger graph
+	struct Route; 		// Defines a route between two graph nodes
+	class Graph; 		// Combines a list of GraphNodes in a network by GraphEdges
 	
-	struct TrafficGraphEdge;
-	struct TrafficGraphNode;
+	class TrafficGraphEdge;
+	class TrafficGraphNode;
+	class TrafficGraph;
 
-	struct TrafficGraphEdge {
+	class TrafficGraphEdge {
 	public:
+		std::vector<Agent> agents;
+
 		size_t goal;
 		prec_t weight;
+
 	public:
 		TrafficGraphEdge() = default;
 		TrafficGraphEdge(size_t goal, prec_t weight);
 	};
 
-	struct TrafficGraphNode {
+	class TrafficGraphNode {
+	public:
 		// stores all connections to other nodes
 		std::vector<TrafficGraphEdge> connections;
 		// stores the OSM ID for this graph node
 		int64_t nodeID;
 		// stores the coordinates of this graph node
-		prec_t lat, lon;
-
+		prec_t x, y;
+	public:
 		TrafficGraphNode() = default;
-		TrafficGraphNode(int64_t nodeID, prec_t lat, prec_t lon);
+		TrafficGraphNode(int64_t nodeID, prec_t x, prec_t y);
 	};
 
-	class FastGraph {
+	class TrafficGraph {
 	public:
-		FastGraph(const Graph& graph);
+		TrafficGraph(const Graph& graph);
 
 		Route findRoute(size_t start, size_t goal);
 
+		TrafficGraphNode& buffer(size_t size) { return graphBuffer[size]; }
+		const TrafficGraphNode& buffer(size_t size) const { return graphBuffer[size]; }
 	protected:
 		std::vector<TrafficGraphNode> graphBuffer;
 	};
@@ -219,7 +227,7 @@ namespace traffic
 		std::vector<GraphNode> graphBuffer;
 		graphmap_t graphMap;
 
-		std::unique_ptr<FastGraph> fastGraph;
+		std::unique_ptr<TrafficGraph> fastGraph;
 	};
 }
 

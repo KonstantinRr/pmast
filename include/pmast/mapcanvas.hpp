@@ -41,8 +41,10 @@
 #include <glm/gtc/type_ptr.hpp>
 
 
-namespace traffic
-{
+namespace traffic {
+	
+class Route; // externally defined Route class
+
 /// <summary>
 /// A canvas that is used to render a map to the screen. This canvas uses its own
 /// OpenGL shaders to render a mesh of the map dynamically on the screen. It offers

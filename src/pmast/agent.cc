@@ -23,9 +23,14 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
+#include <glm/glm.hpp>
+
 #include <pmast/engine.hpp>
 #include <pmast/agent.hpp>
 #include <pmast/parser.hpp>
+#include <pmast/osm.hpp>
+#include <pmast/osm_graph.hpp>
+#include <pmast/geom.hpp>
 
 #include <ctpl.h>
 #include <thread>
@@ -39,40 +44,36 @@ using namespace std;
 void Agent::setGoal(int64_t newGoal) { goalID = newGoal; }
 int64_t Agent::getGoal() const { return goalID; }
 
-void Agent::update() {
-
+void Agent::update(double dt) {
+    
 }
 
 void Agent::makeGreedyChoice() {
-    auto &goal = world->getGraph()->findNodeByID(goalID);
-    auto &node = world->getGraph()->findNodeByID(nextVisited);
-    
-    vec2 goalVec = glm::normalize(node.getPosition() - goal.getPosition());
-
-    int bestFit = -1;
-    float bestDotProduct = 0;
-    for (size_t i = 0; i < node.connections.size(); i++) {
-        // Creates the junction vector for each connection
-        int64_t junctionCrossID = node.connections[i].goal;
-        auto &junctionCrossNode = world->getGraph()->findNodeByID(junctionCrossID);
-        vec2 junctionCross = glm::normalize(
-            junctionCrossNode.getPosition() - node.getPosition());
-
-        // checks if the junction vector is better than
-        // the current best one. Updates the values if so.
-        float dotProduct = glm::dot(junctionCross, goalVec);
-        if (dotProduct > bestDotProduct) {
-            bestDotProduct = dotProduct;
-            bestFit = static_cast<int>(i);
-        }
-    }
-
-    // There is no way left. The agent is stuck
-    if (bestFit == -1) {
-        // TODO
-    } else {
-        // TODO
-    }
+    //auto &goal = world->getGraph()->findNodeByID(goalID);
+    //auto &node = world->getGraph()->findNodeByID(nextVisited);
+    //vec2 goalVec = glm::normalize(node.getPosition() - goal.getPosition());
+    //int bestFit = -1;
+    //float bestDotProduct = 0;
+    //for (size_t i = 0; i < node.connections.size(); i++) {
+    //    // Creates the junction vector for each connection
+    //    int64_t junctionCrossID = node.connections[i].goal;
+    //    auto &junctionCrossNode = world->getGraph()->findNodeByID(junctionCrossID);
+    //    vec2 junctionCross = glm::normalize(
+    //        junctionCrossNode.getPosition() - node.getPosition());
+    //    // checks if the junction vector is better than
+    //    // the current best one. Updates the values if so.
+    //    float dotProduct = glm::dot(junctionCross, goalVec);
+    //    if (dotProduct > bestDotProduct) {
+    //        bestDotProduct = dotProduct;
+    //        bestFit = static_cast<int>(i);
+    //    }
+    //}
+    //// There is no way left. The agent is stuck
+    //if (bestFit == -1) {
+    //    // TODO
+    //} else {
+    //    // TODO
+    //}
 }
 
 // ---- WorldChunk ---- //

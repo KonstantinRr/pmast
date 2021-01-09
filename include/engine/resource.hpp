@@ -39,68 +39,133 @@
 class FIBITMAP; // forward declaration of FreeImage types
 
 namespace nyrem {
-    /// -- class PointVertex2D --
+    /// <summary> class PointVertex2D
     /// This data struct stores 2 dimensional vertex
     /// data in the following layout:
-    /// float32 x, float32 y
-    struct PointVertex2D {
-        float data[2];
+    /// float32/float64 x, float32/float64 y
+    /// </summary>
+    template<typename Type>
+    struct PointVertex2DGeneric {
+        static constexpr size_t
+            INDEX_X = 0, INDEX_Y = 1;
+        Type data[2];
 
-        PointVertex2D();
-        PointVertex2D(float x, float y);
+        PointVertex2DGeneric() noexcept;
+        PointVertex2DGeneric(Type x, Type y) noexcept;
+
+        inline Type x() const noexcept { return data[INDEX_X]; }
+        inline Type y() const noexcept { return data[INDEX_Y]; }
     };
 
-    /// -- class Vertex2D --
+    using FloatPointVertex2D = PointVertex2DGeneric<float>;
+    using DoublePointVertex2D = PointVertex2DGeneric<double>;
+    using PointVertex2D = FloatPointVertex2D;
+
+    /// <summary> class Vertex2D
     /// This data struct stores 2 dimensional vertex
     /// and texture data in the following layout:
-    /// float32 x, float32 y
-    /// float32 tx, float32 ty 
-    struct Vertex2D {
-        float data[4];
+    /// float32/float64 x, float32/float64 y
+    /// float32/float64 tx, float32/float64 ty
+    /// </summary>
+    template<typename Type>
+    struct Vertex2DGeneric {
+        static constexpr size_t
+            INDEX_X = 0, INDEX_Y = 1,
+            INDEX_TX = 2, INDEX_TY = 3;
+        Type data[4];
 
-        Vertex2D();
-        Vertex2D(float x, float y, float tx, float ty);
+        Vertex2DGeneric() noexcept;
+        explicit Vertex2DGeneric(Type x, Type y) noexcept;
+        explicit Vertex2DGeneric(Type x, Type y, Type tx, Type ty) noexcept;
+
+        inline Type x() const noexcept { return data[INDEX_X]; }
+        inline Type y() const noexcept { return data[INDEX_Y]; }
+        inline Type tx() const noexcept { return data[INDEX_TX]; }
+        inline Type ty() const noexcept { return data[INDEX_TY]; }
     };
 
-    /// -- class Point Vertex --
+    using FloatVertex2D = Vertex2DGeneric<float>;
+    using DoubleVertex2D = Vertex2DGeneric<double>;
+    using Vertex2D = FloatVertex2D;
+
+    /// <summary> class Point Vertex
     /// This data struct stores 3 dimensional vertex
     /// data in the following layout:
     /// float32 x, float32 y, float32 z
-    struct PointVertex {
-        float data[3];
+    /// </summary>
+    template<typename Type>
+    struct PointVertexGeneric {
+        static constexpr size_t
+            INDEX_X = 0, INDEX_Y = 1, INDEX_Z = 2;
+        Type data[3];
 
-        PointVertex();
-        PointVertex(float x, float y, float z);
+        PointVertexGeneric() noexcept;
+        PointVertexGeneric(Type x, Type y, Type z) noexcept;
+
+        inline Type x() const noexcept { return data[INDEX_X]; }
+        inline Type y() const noexcept { return data[INDEX_Y]; }
+        inline Type z() const noexcept { return data[INDEX_Z]; }
     };
 
-    /// -- class NormalVertex --
+    using FloatPointVertex = PointVertexGeneric<float>;
+    using DoublePointVertex = PointVertexGeneric<double>;
+    using PointVertex = FloatPointVertex;
+
+    /// <summary> class NormalVertex
     /// This data struct stores 3 dimensional vertex,
     /// and normal data in the following layout:
     /// float32 x, float32 y, float32 z
     /// float32 nx, float32 ny, float32 nz
-    struct NormalVertex {
-        float data[6];
+    /// </summary>
+    template<typename Type>
+    struct NormalVertexGeneric {
+        static constexpr size_t
+            INDEX_X = 0, INDEX_Y = 1, INDEX_Z = 2,
+            INDEX_NX = 3, INDEX_NY = 4, INDEX_NZ = 5;
+        Type data[6];
 
-        NormalVertex();
-        NormalVertex(
-            float x, float y, float z,
-            float nx, float ny, float nz);
+        NormalVertexGeneric() noexcept;
+        NormalVertexGeneric(
+            Type x, Type y, Type z,
+            Type nx, Type ny, Type nz) noexcept;
+
+        inline Type x() const noexcept { return data[INDEX_X]; }
+        inline Type y() const noexcept { return data[INDEX_Y]; }
+        inline Type z() const noexcept { return data[INDEX_Z]; }
+        inline Type nx() const noexcept { return data[INDEX_NX]; }
+        inline Type ny() const noexcept { return data[INDEX_NY]; }
+        inline Type nz() const noexcept { return data[INDEX_NZ]; }
     };
 
+    using FloatNormalVertex = NormalVertexGeneric<float>;
+    using DoubleNormalVertex = NormalVertexGeneric<double>;
+    using NormalVertex = FloatNormalVertex;
+
+    /// <summary> class NormalVertex
     /// This data struct stores 3 dimensional vertex,
     /// normal and texture data in the following layout:
     /// float32 x, float32 y, float32 z
     /// float32 nx, float32 ny, float32 nz
     /// float32 tx, float32 ty
-    struct Vertex {
-        float data[8];
+    /// </summary>
+    template<typename Type>
+    struct VertexGeneric {
+        static constexpr size_t
+            INDEX_X = 0, INDEX_Y = 1, INDEX_Z = 2,
+            INDEX_NX = 3, INDEX_NY = 4, INDEX_NZ = 5;
+        Type data[8];
         
         // Constructors
-        Vertex();
-        Vertex(float x, float y, float z,
-            float nx, float ny, float nz,
-            float tx1, float ty1);
+        VertexGeneric() noexcept;
+        VertexGeneric(
+            Type x, Type y, Type z,
+            Type nx, Type ny, Type nz,
+            Type tx1, Type ty1) noexcept;
     };
+
+    using FloatVertex = VertexGeneric<float>;
+    using DoubleVertex = VertexGeneric<double>;
+    using Vertex = FloatVertex;
 
     struct Indice {
         int v, t, n;

@@ -42,9 +42,13 @@
 namespace nyrem {
 
 enum ModelType {
-    VERTEX, POINT_VERTEX, NORMAL_VERTEX,
-    VERTEX2D, VERTEX_INDEXED, POINT_VERTEX_INDEXED,
-    NORMAL_VERTEX_INDEXED
+    VERTEX,                 // struct Vertex
+    POINT_VERTEX,           // struct PointVertex
+    NORMAL_VERTEX,          // struct NormalVertex
+    VERTEX2D,               // struct Vertex2D
+    VERTEX_INDEXED,         // struct Vertex Indexed
+    POINT_VERTEX_INDEXED,   // struct PointVertex Indexed
+    NORMAL_VERTEX_INDEXED   // struct NormalVertex Indexed
 };
 
 class GLModel {

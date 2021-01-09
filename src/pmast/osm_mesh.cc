@@ -33,6 +33,7 @@
 #include <pmast/osm.hpp>
 #include <pmast/agent.hpp>
 #include <pmast/osm_mesh.hpp>
+#include <pmast/osm_graph.hpp>
 #include <pmast/geom.hpp>
 
 #define USE_OPENGL

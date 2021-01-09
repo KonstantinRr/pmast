@@ -67,35 +67,81 @@ std::vector<char> nyrem::readFile(const std::string &file) {
 }
 
 // ---- PointVertex ---- //
+template<typename Type>
+PointVertexGeneric<Type>::PointVertexGeneric() noexcept
+	: data{ static_cast<Type>(0.0) } { }
+template<typename Type>
+PointVertexGeneric<Type>::PointVertexGeneric(Type px, Type py, Type pz) noexcept
+	: data{ px, py, pz } { }
 
-PointVertex::PointVertex() :
-	data{0.0f} { }
-PointVertex::PointVertex(float px, float py, float pz) :
-	data{px, py, pz} { }
+template struct PointVertexGeneric<float>;
+template struct PointVertexGeneric<double>;
 
 // ---- NormalVertex ---- //
+template<typename Type>
+NormalVertexGeneric<Type>::NormalVertexGeneric() noexcept
+	: data{ static_cast<Type>(0.0) } { }
+template<typename Type>
+NormalVertexGeneric<Type>::NormalVertexGeneric(
+	Type x, Type y, Type z,
+    Type nx, Type ny, Type nz) noexcept
+	: data{x, y, z, nx, ny, nz} { }
 
-NormalVertex::NormalVertex() :
-	data{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f} { }
-NormalVertex::NormalVertex(
-	float px, float py, float pz,
-    float pnx, float pny, float pnz) :
-	data{px, py, pz, pnx, pny, pnz} { }
+template struct NormalVertexGeneric<float>;
+template struct NormalVertexGeneric<double>;
 
 // ---- Vertex ---- //
 
-Vertex::Vertex() : data{0.0f} { }
+template<typename Type>
+VertexGeneric<Type>::VertexGeneric() noexcept
+	: data{ static_cast<Type>(0.0) } { }
 
-Vertex::Vertex(float px, float py, float pz,
-    float pnx, float pny, float pnz,
-    float ptx, float pty) :
-	data{px, py, pz, pnx, pny, pnz, ptx, pty} { }
+template<typename Type>
+VertexGeneric<Type>::VertexGeneric(
+	Type px, Type py, Type pz,
+    Type pnx, Type pny, Type pnz,
+    Type ptx, Type pty) noexcept
+	: data{
+		px, py, pz,
+		pnx, pny, pnz,
+		ptx, pty
+	} { }
+
+template struct VertexGeneric<float>;
+template struct VertexGeneric<double>;
 
 // ---- Vertex2D ---- //
+template<typename Type>
+Vertex2DGeneric<Type>::Vertex2DGeneric() noexcept
+	: data{ static_cast<Type>(0.0f) } { }
 
-Vertex2D::Vertex2D() : data{0.0f} { }
-Vertex2D::Vertex2D(float px, float py, float ptx, float pty)
-	: data{px, py, ptx, pty} { }
+template<typename Type>
+Vertex2DGeneric<Type>::Vertex2DGeneric(Type x, Type y) noexcept
+	: data{x, y,
+		static_cast<Type>(0.0f),
+		static_cast<Type>(0.0f) } { }
+
+template<typename Type>
+Vertex2DGeneric<Type>::Vertex2DGeneric(Type x, Type y, Type tx, Type ty) noexcept
+	: data{x, y, tx, ty} { }
+
+template struct Vertex2DGeneric<float>;
+template struct Vertex2DGeneric<double>;
+
+// ---- PointVertex2D ---- //
+template<typename Type>
+PointVertex2DGeneric<Type>::PointVertex2DGeneric() noexcept
+	: data{
+		static_cast<Type>(0.0),
+		static_cast<Type>(0.0) } { }
+
+template<typename Type>
+PointVertex2DGeneric<Type>::PointVertex2DGeneric(Type x, Type y) noexcept
+	: data{ x, y } { }
+
+// Explicit instantiation //
+template struct PointVertex2DGeneric<float>;
+template struct PointVertex2DGeneric<double>;
 
 /////////////////////////////
 //// ---- HeightMap ---- ////
