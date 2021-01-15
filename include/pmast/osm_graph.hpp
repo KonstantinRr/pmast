@@ -42,22 +42,56 @@ using graphmap_t = robin_hood::unordered_node_map<int64_t, size_t>;
 
 namespace traffic
 {
-    // ---- Graph Representation ---- //
-	struct GraphEdge; 	// A single edge that is part of a larger graph
-	struct GraphNode; 	// A node that is part of a larger graph
-	struct Route; 		// Defines a route between two graph nodes
-	class Graph; 		// Combines a list of GraphNodes in a network by GraphEdges
-	
-	class TrafficGraphEdge;
-	class TrafficGraphNode;
-	class TrafficGraph;
+	struct Route; 			// Defines a route between two graph nodes
 
+    // ==== OSM Graph Representation ==== //
+	struct GraphEdge; 		// A single edge that connects two GraphNode(s)
+	struct GraphNode; 		// A node that is part of a larger graph
+	class Graph; 			// Combines a list of GraphNodes in a network by GraphEdges
+	
+	// ==== Traffic Graph Representation ==== //
+	class TrafficGraphEdge;	// An edge that connects two TrafficGraphNode(s) together
+	class TrafficGraphNode;	// A node in the TrafficGraph network
+	class TrafficGraph;		// A collection of traffic graph nodes
+
+	/// <summary> class TrafficGraphEdge
+	/// A traffic graph edge represents a street in the context of
+	/// city traffic simulation. 
 	class TrafficGraphEdge {
 	public:
+		/// <summary>
+		/// Stores a list of all agents that are currently on this route
+		/// </summary>
 		std::vector<Agent> agents;
 
+		/// <summary>
+		/// Stores the destination index of this connection. This is the
+		/// index in the TrafficGraph buffer object that will be reached
+		/// when the end of this edge is reached.
+		/// </summary>
 		size_t goal;
+
+		/// <summary>
+		/// Stores the weight/cost of this node. This value does not have
+		/// any meaning on its own but is just used as measurement on how
+		/// fast this route may be travelled.
+		/// </summary>
 		prec_t weight;
+
+		/// <summary>
+		/// Stores the maximum speed that is allowd on this route. This speed
+		/// is usually defined by country laws.
+		/// </summary>
+		prec_t maxAllowedSpeed;
+
+		/// <summary>
+		/// Stores the maximum speed that is physcially possible on this route.
+		/// This speed can not be topped without causing a traffic problem
+		/// </summary>
+		prec_t maxSpeed;
+
+		/// <summary>Stores the amount of lanes that this 
+		uint8_t lanes;
 
 	public:
 		TrafficGraphEdge() = default;
@@ -79,12 +113,12 @@ namespace traffic
 
 	class TrafficGraph {
 	public:
-		TrafficGraph(const Graph& graph);
+		explicit TrafficGraph(const Graph& graph);
 
 		Route findRoute(size_t start, size_t goal);
 
-		TrafficGraphNode& buffer(size_t size) { return graphBuffer[size]; }
-		const TrafficGraphNode& buffer(size_t size) const { return graphBuffer[size]; }
+		inline TrafficGraphNode& buffer(size_t size) noexcept {return graphBuffer[size]; }
+		inline const TrafficGraphNode& buffer(size_t size) const noexcept { return graphBuffer[size]; }
 	protected:
 		std::vector<TrafficGraphNode> graphBuffer;
 	};
@@ -117,6 +151,8 @@ namespace traffic
 		// stores the weight
 		prec_t weight;
 	};
+
+	// ==== OSM Classes
 
 	/// <summary>
 	/// Graph nodes are used in a graph representation to perform route optimization.

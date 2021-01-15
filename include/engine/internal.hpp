@@ -75,6 +75,8 @@ bool lt_check_gl_error(const char* cmd, int line, const char* file);
     #define LT_DEFINE_GL_MACRO 1
 #endif
 
+#define NYREM_NAMESPACE
+
 #ifdef LT_DEFINE_GL_MACRO
     #if defined(TARGET_RELEASE)
         #define CGL(cmd) cmd
@@ -97,9 +99,27 @@ bool lt_check_gl_error(const char* cmd, int line, const char* file);
     #define GL_STACK_UNDERFLOW 0x0504
 #endif
 
-namespace nyrem { }
-
 #include <glad/glad.h>
 #include <spdlog/spdlog.h>
+#include <glm/glm.hpp>
+
+namespace nyrem {
+	// ---- Matrices ---- //
+	using mat4x4 = glm::mat4x4;
+	using mat3x3 = glm::mat3x3;
+	using mat2x2 = glm::mat2x2;
+
+	using mat4x4 = glm::mat4x4;
+	using mat3x3 = glm::mat3x3;
+	using mat2x2 = glm::mat2x2;	
+	// ---- Vectors ---- //
+	using vec4 = glm::vec4;
+	using vec3 = glm::vec3;
+	using vec2 = glm::vec2;
+	
+	using dvec4 = glm::dvec4;
+	using dvec3 = glm::dvec3;
+	using dvec2 = glm::dvec2;
+}
 
 #endif // !NYREM_MODULE_HPP

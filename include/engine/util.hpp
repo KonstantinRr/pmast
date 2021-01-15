@@ -28,44 +28,50 @@
 #include <vector>
 #include <string>
 
+#ifdef NYREM_NAMESPACE
 namespace nyrem {
-	class FastSStream {
-	public:
-		void add(const char *string);
-		void add(const char *string, size_t size);
-		void add(const std::string &string, bool lives=false);
-        void add(std::string &&string);
-		void add(char fill, size_t size);
+#endif
 
-		std::string generate() const;
-		void clear();
-		inline size_t bufferSize() { return segments.size(); }
+class FastSStream {
+public:
+	void add(const char *string);
+	void add(const char *string, size_t size);
+	void add(const std::string &string, bool lives=false);
+	void add(std::string &&string);
+	void add(char fill, size_t size);
 
-	private:
-		enum DataType {
-			TYPE_STRING,
-			TYPE_STRING_INDEX,
-			TYPE_CHAR,
-			TYPE_FILL
-		};
-		
-		struct DataSegment {
-			union {
-				struct {
-					size_t size;
-					char fill;
-				} u_fill;
-				struct {
-					const char *data;
-					size_t size;
-				} u_char;
-				const std::string *u_string;
-				size_t u_index;
-			};
-			DataType type;
-		};
+	std::string generate() const;
+	void clear();
+	inline size_t bufferSize() { return segments.size(); }
 
-        std::vector<std::string> strings;
-		std::vector<DataSegment> segments;
+private:
+	enum DataType {
+		TYPE_STRING,
+		TYPE_STRING_INDEX,
+		TYPE_CHAR,
+		TYPE_FILL
 	};
+	
+	struct DataSegment {
+		union {
+			struct {
+				size_t size;
+				char fill;
+			} u_fill;
+			struct {
+				const char *data;
+				size_t size;
+			} u_char;
+			const std::string *u_string;
+			size_t u_index;
+		};
+		DataType type;
+	};
+
+	std::vector<std::string> strings;
+	std::vector<DataSegment> segments;
+};
+
+#ifdef NYREM_NAMESPACE
 }
+#endif

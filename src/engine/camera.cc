@@ -29,10 +29,18 @@
 
 using namespace nyrem;
 
+//// ---- Camera ---- ////
+mat4x4 Camera::viewMatrix() const noexcept { return mat4x4(1.0f); }
+mat4x4 Camera::projectionMatrix() const noexcept { return mat4x4(1.0f); }
+
+
 //// ---- TransformedCamera --- ////
-TransformedCamera::TransformedCamera() : k_mat_view(1.0f), k_mat_projection(1.0f) { }
-TransformedCamera::TransformedCamera(const glm::mat4x4 &view, const glm::mat4x4 &proj)
-    : k_mat_view(view), k_mat_projection(proj) { }
+TransformedCamera::TransformedCamera() noexcept :
+	k_mat_view(1.0f), k_mat_projection(1.0f) { }
+TransformedCamera::TransformedCamera(
+		const glm::mat4x4 &view,
+		const glm::mat4x4 &proj) noexcept :
+	k_mat_view(view), k_mat_projection(proj) { }
 
 void TransformedCamera::setViewMatrix(const glm::mat4x4 &mat) { k_mat_view = mat; }
 void TransformedCamera::setProjectionMatrix(const glm::mat4x4 &mat) { k_mat_projection = mat; }
