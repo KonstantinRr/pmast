@@ -25,7 +25,7 @@
 
 #include <engine/glmodel.hpp>
 
-using namespace nyrem;
+NYREM_USE_NAMESPACE
 
 GLModel::GLModel(GLsizei modelSize, GLuint vao, GLuint vbo) {
 	this->modelSize = modelSize;
@@ -247,6 +247,7 @@ GLTexture2D::GLTexture2D(
 }
 */
 
+/*
 GLTexture2D::GLTexture2D(const BitmapImage &image) {
     genTexture();
     using uchar = unsigned char;
@@ -263,6 +264,7 @@ GLTexture2D::GLTexture2D(const BitmapImage &image) {
     applyFilters();
     delete[] bits;
 }
+*/
 
 GLTexture2D::GLTexture2D(const ImageRGB8 &image) {
     genTexture();

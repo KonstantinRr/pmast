@@ -34,7 +34,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-using namespace nyrem;
+NYREM_USE_NAMESPACE
 
 // Maps each window to an engine object
 std::unordered_map<GLFWwindow*, Engine*> windowMap;
@@ -461,8 +461,8 @@ void Engine::exit()
 }
 
 
-int SizedObject::width() { return w; }
-int SizedObject::height() { return h; }
-
-void SizedObject::setWidth(int width) { w = width; }
-void SizedObject::setHeight(int height) { h = height; }
+//int SizedObject::width() { return w; }
+//int SizedObject::height() { return h; }
+//
+//void SizedObject::setWidth(int width) { w = width; }
+//void SizedObject::setHeight(int height) { h = height; }

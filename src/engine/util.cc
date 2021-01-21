@@ -25,7 +25,7 @@
 
 #include <engine/util.hpp>
 
-using namespace nyrem;
+NYREM_USE_NAMESPACE
 
 //// ---- FastSStream ---- //// 
 

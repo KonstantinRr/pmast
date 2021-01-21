@@ -28,20 +28,25 @@
 #ifndef GRAHP_HPP
 #define GRAHP_HPP
 
-#include "engine.hpp"
+#include <pmast/internal.hpp>
+#include <pmast/osm.hpp>
 
 #include <vector>
 #include <memory>
 #include <unordered_map>
 #include <glm/glm.hpp>
 
-#include "osm.hpp"
-#include <pmast/agent.hpp>
 
 using graphmap_t = robin_hood::unordered_node_map<int64_t, size_t>;
 
 namespace traffic
 {
+	class Agent;
+	class World;
+
+	using AgentRef = Agent*;
+	using WorldRef = World*;
+
 	struct Route; 			// Defines a route between two graph nodes
 
     // ==== OSM Graph Representation ==== //
@@ -54,15 +59,72 @@ namespace traffic
 	class TrafficGraphNode;	// A node in the TrafficGraph network
 	class TrafficGraph;		// A collection of traffic graph nodes
 
+	using TrafficGraphEdgeIndex = size_t;
+	using TrafficGraphNodeIndex = size_t;
+	using TrafficGraphEdgeRef = TrafficGraphEdge*;
+	using TrafficGraphNodeRef = TrafficGraphNode*;
+
+	extern size_t nullIndex;
+
+	/// <summary>
+	/// A route defines a way to navigate inside a Graph. It stores a sequential
+	/// array of node IDs defining a way to navigate. Routes are produced by path
+	/// finding algorithms.
+	/// </summary>
+	template<typename Type>
+	class RouteGeneric
+	{
+	public:
+		// ---- Member definitions ---- //
+		std::vector<Type> nodes;
+
+		RouteGeneric() = default;
+		RouteGeneric(std::vector<Type> const& nodes) : nodes(nodes) { }
+		RouteGeneric(std::vector<Type>&& nodes) : nodes(std::move(nodes)) { }
+
+		size_t size() const { return nodes.size(); }
+		bool exists() const { return !nodes.empty(); }
+		void addBack(Type nodeID) { nodes.push_back(nodeID); }
+		void addFront(Type nodeID) { nodes.insert(nodes.begin(), nodeID); }
+
+		auto begin() const { return nodes.begin(); }
+		auto end() const { return nodes.end(); }
+
+		void reverse() { std::reverse(nodes.begin(), nodes.end()); }
+
+		const int64_t& operator[](size_t idx) const { return nodes[idx]; }
+	};
+
+	class Route : public RouteGeneric<int64_t> {
+	public:
+		Route() = default;
+		Route(std::vector<int64_t> const& nodes);
+		Route(std::vector<int64_t>&& nodes);
+	};
+
+	class IndexRoute : public RouteGeneric<TrafficGraphNodeIndex> {
+	public:
+		IndexRoute() = default;
+		IndexRoute(std::vector<TrafficGraphNodeIndex> const& nodes);
+		IndexRoute(std::vector<TrafficGraphNodeIndex>&& nodes);
+	};
+
+
 	/// <summary> class TrafficGraphEdge
-	/// A traffic graph edge represents a street in the context of
-	/// city traffic simulation. 
+	/// A traffic graph edge represents a part of a street in the context of
+	/// city traffic simulation. Each edge connects two nodes with each other in
+	/// a straight line. It is therefore the optimal path between those points.
+	/// A whole street with turns and corners is therefore implemented using many
+	/// nodes and edges connecting them together.
+	/// Each edge contains 
+	/// </summary>
 	class TrafficGraphEdge {
 	public:
 		/// <summary>
-		/// Stores a list of all agents that are currently on this route
+		/// Stores a list of all agents that are currently on this route.
+		/// We currently only support single lane traffic. So no overtaking yet.
 		/// </summary>
-		std::vector<Agent> agents;
+		std::vector<AgentRef> agents;
 
 		/// <summary>
 		/// Stores the destination index of this connection. This is the
@@ -79,6 +141,11 @@ namespace traffic
 		prec_t weight;
 
 		/// <summary>
+		/// Stores the distance between the start of this edge and the end.
+		/// </summary>
+		prec_t distance;
+
+		/// <summary>
 		/// Stores the maximum speed that is allowd on this route. This speed
 		/// is usually defined by country laws.
 		/// </summary>
@@ -86,42 +153,73 @@ namespace traffic
 
 		/// <summary>
 		/// Stores the maximum speed that is physcially possible on this route.
-		/// This speed can not be topped without causing a traffic problem
+		/// This speed can not be topped without causing an accident. The difference
+		/// between maxSpeed and maxAllowedSpeed is therefore the 'safe speeding' limit.
+		/// It is physically safe to drive 50 in most 30er zones, even though it is not
+		/// allowed. This does not take into consideration external events like children
+		/// running on the street.
 		/// </summary>
 		prec_t maxSpeed;
 
-		/// <summary>Stores the amount of lanes that this 
+		/// <summary>
+		/// Stores the amount of lanes that this street. Later usage.
+		/// </summary>
 		uint8_t lanes;
 
 	public:
 		TrafficGraphEdge() = default;
-		TrafficGraphEdge(size_t goal, prec_t weight);
+		TrafficGraphEdge(size_t goal, prec_t weight, prec_t distance);
 	};
 
 	class TrafficGraphNode {
 	public:
-		// stores all connections to other nodes
+		/// <summary>
+		/// Stores connections to other nodes using all viable streets from this node.
+		/// </summary>
 		std::vector<TrafficGraphEdge> connections;
-		// stores the OSM ID for this graph node
-		int64_t nodeID;
-		// stores the coordinates of this graph node
+
+		/// <summary>
+		/// Stores the OSM ID for this graph node
+		/// </summary>
+		GraphNode *linked;
+		
+		/// <summary>
+		/// Stores the coordinates of this graph node. 
+		/// </summary>
 		prec_t x, y;
+
 	public:
 		TrafficGraphNode() = default;
-		TrafficGraphNode(int64_t nodeID, prec_t x, prec_t y);
+		TrafficGraphNode(GraphNode *linked, prec_t x, prec_t y);
+
+		void linkBack() noexcept;
 	};
 
 	class TrafficGraph {
 	public:
-		explicit TrafficGraph(const Graph& graph);
+		explicit TrafficGraph(Graph& graph);
 
 		Route findRoute(size_t start, size_t goal);
+		IndexRoute findIndexRoute(size_t start, size_t goal);
+		Route toIDRoute(const IndexRoute &idxRoute) const noexcept;
+
+		TrafficGraphNode& findNodeByIndex(TrafficGraphNodeIndex nodeIdx) noexcept;
+		TrafficGraphEdge& findEdgeByIndex(TrafficGraphNodeIndex nodeIdx, TrafficGraphEdgeIndex edgeIdx) noexcept;
+
+		size_t nodeCount() const noexcept;
+		std::vector<TrafficGraphNode>& nodes() noexcept;
+		const std::vector< TrafficGraphNode>& nodes() const noexcept;
+
+
 
 		inline TrafficGraphNode& buffer(size_t size) noexcept {return graphBuffer[size]; }
 		inline const TrafficGraphNode& buffer(size_t size) const noexcept { return graphBuffer[size]; }
+	
 	protected:
 		std::vector<TrafficGraphNode> graphBuffer;
 	};
+
+	// ==== Default OSM Graph ==== //
 
 	/// <summary>
 	/// Graph edges are used to connect GraphNodes with each other. The implemented
@@ -137,7 +235,7 @@ namespace traffic
 		/// <param name="goalID">The destination where this edge leads</param>
 		/// <param name="weight">The weight that is associated with this edge</param>
 		/// <returns></returns>
-		GraphEdge(int64_t goalID, prec_t weight);
+		GraphEdge(int64_t goalID, prec_t weight, prec_t distance);
 
 		// ---- Size access members ---- //
 		inline bool hasManagedSize() const { return false; }
@@ -150,6 +248,8 @@ namespace traffic
 		int64_t goal;
 		// stores the weight
 		prec_t weight;
+
+		prec_t distance;
 	};
 
 	// ==== OSM Classes
@@ -174,27 +274,15 @@ namespace traffic
 		inline glm::vec2 getPosition() const { return glm::vec2(lat, lon); }
 		inline prec_t getLatitude() const { return lat; }
 		inline prec_t getLongitude() const { return lon; }
+
+		inline void link(TrafficGraphNode &node) { m_linked = &node; }
 	public:
 		// ---- Member definitions ---- //
 		prec_t lat, lon;
 		int64_t nodeID;
 		std::vector<GraphEdge> connections;
-	};
 
-	/// <summary>
-	/// A route defines a way to navigate inside a Graph. It stores a sequential
-	/// array of node IDs defining a way to navigate. Routes are produced by path
-	/// finding algorithms.
-	/// </summary>
-	struct Route
-	{
-		Route() = default;
-
-		inline bool exists() const { return !nodes.empty(); }
-		inline void addNode(int64_t nodeID) { nodes.push_back(nodeID); }
-
-		// ---- Member definitions ---- //
-		std::vector<int64_t> nodes;
+		TrafficGraphNode *m_linked;
 	};
 
 	/// <summary>

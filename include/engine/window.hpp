@@ -28,13 +28,13 @@
 #ifndef NYREM_WINDOW_HPP
 #define NYREM_WINDOW_HPP
 
-#include "listener.hpp"
+#include <engine/internal.hpp>
+#include <engine/listener.hpp>
 
-#include <memory>
+#include <memory>     // uses std::unique_ptr
 #include <functional>
 
-namespace nyrem
-{
+NYREM_NAMESPACE_BEGIN
 
 class SizedObject;
 class Tickable;
@@ -43,16 +43,16 @@ class WorldHandler;
 class InputHandler;
 class Renderable;
 
-class SizedObject {
-public:
-	virtual int width();
-	virtual int height();
-
-	void setWidth(int width);
-	void setHeight(int height);
-protected:
-	int w, h;
-};
+//class SizedObject {
+//public:
+//	virtual int width();
+//	virtual int height();
+//
+//	void setWidth(int width);
+//	void setHeight(int height);
+//protected:
+//	int w, h;
+//};
 
 using MouseType = uint8_t;
 namespace mouse
@@ -67,8 +67,15 @@ namespace mouse
 using KeyType = uint16_t;
 namespace keys
 {
+	/// <summary>
+	/// Stores all key states that a key event can have
+	/// </summary>
 	const extern KeyType
 		KEYSTATUS_PRESSED, KEYSTATUS_RELEASED, KEYSTATUS_UNKNOWN;
+	/// <summary>
+	/// Stores most keys on a regular keyboard. Every other key is interpreted as
+	/// NYREM_KEY_UNKNOWN
+	/// </summary>
 	const extern KeyType
 		NYREM_KEY_UNKNOWN, NYREM_KEY_SPACE, NYREM_KEY_APOSTROPHE, NYREM_KEY_COMMA,
 		NYREM_KEY_MINUS, NYREM_KEY_PERIOD, NYREM_KEY_SLASH, NYREM_KEY_0, NYREM_KEY_1,
@@ -143,13 +150,17 @@ public:
 
 	int scanCode(KeyType key) const;
 
-	/// <summary>Gets a callback reference whenever a specific key is pressed.
-	/// Callback arguments: void(int scancode, int action, int mods)</summary>
+	/// <summary>
+	/// Gets a callback reference whenever a specific key is pressed.
+	/// Callback arguments: void(int scancode, int action, int mods)
+	/// </summary>
 	/// <returns>Listener object that listens to key presses</returns>
 	Listener<CallbackSKey>& callbackKey(KeyType key);
 	
-	/// <summary>Gets a callback reference whenever a specific key is pressed.
-	/// Callback arguments: void(int key, int scancode, int mods)</summary>
+	/// <summary>
+	/// Gets a callback reference whenever a specific key is pressed.
+	/// Callback arguments: void(int key, int scancode, int mods)
+	/// </summary>
 	/// <returns>Listener object that listens to key presses</returns>
 	Listener<CallbackLoopKey>& loopKey(KeyType key, bool enable=true);
 	
@@ -272,6 +283,6 @@ protected:
 	std::unique_ptr<EngineImpl> k_impl;
 };
 
-} // !nyrem
+NYREM_NAMESPACE_END
 
 #endif // !NYREM_WINDOW_HPP

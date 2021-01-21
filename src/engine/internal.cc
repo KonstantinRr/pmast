@@ -25,7 +25,7 @@
 
 #include <engine/internal.hpp>
 
-using namespace nyrem;
+NYREM_USE_NAMESPACE
 
 bool lt_check_gl_error(const char *cmd, int line, const char *file) {
      GLenum err = glGetError();

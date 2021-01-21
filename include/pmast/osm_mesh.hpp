@@ -28,7 +28,7 @@
 #ifndef OSM_MESH_H
 #define OSM_MESH_H
 
-#include "engine.hpp"
+#include <pmast/internal.hpp>
 
 #include <glm/glm.hpp>
 #include <vector>

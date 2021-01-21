@@ -29,23 +29,27 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
+#include <limits>
+
+NYREM_USE_NAMESPACE
+
+Entity::Entity() noexcept : IDObject() { }
+Entity::Entity(uint32_t id) noexcept : IDObject(id) { }
+
+IDObject::IDObject() noexcept : id(std::numeric_limits<uint32_t>::max()) { }
+IDObject::IDObject(uint32_t id) noexcept : id(id) { }
+
+bool IDObject::hasID() const noexcept { return id != std::numeric_limits<uint32_t>::max(); }
+
+void IDObject::setID(uint32_t id) noexcept { this->id = id; }
+uint32_t IDObject::getID() const noexcept { return id; }
+
 // ---- Entity ---- //
-using namespace nyrem;
 
-Entity::Entity() : id(-1) { }
-Entity::Entity(int id) : id(id) { }
-
-Entity& Entity::setID(int pID) {
-    this->id = pID;
-    return *this;
-}
-
-int Entity::getID() const { return id; }
-
-bool Entity::hasModel() const { return k_model.get() != nullptr; }
-bool Entity::hasTexture() const { return k_texture.get() != nullptr; }
-bool Entity::hasNormalTexture() const { return k_normal.get() != nullptr; }
-bool Entity::hasMaterial() const { return k_material.get() != nullptr; }
+bool Entity::hasModel() const noexcept { return k_model.get() != nullptr; }
+bool Entity::hasTexture() const noexcept { return k_texture.get() != nullptr; }
+bool Entity::hasNormalTexture() const noexcept { return k_normal.get() != nullptr; }
+bool Entity::hasMaterial() const noexcept { return k_material.get() != nullptr; }
 
 void Entity::setModel(const std::shared_ptr<GLModel> &model) { k_model = model; }
 void Entity::setTexture(const std::shared_ptr<GLTexture2D> &tex) { k_texture = tex; }
@@ -57,6 +61,8 @@ const std::shared_ptr<GLTexture2D>& Entity::getTexture() const { return k_textur
 const std::shared_ptr<GLTexture2D>& Entity::getNormalTexture() const { return k_normal; }
 const std::shared_ptr<GLMaterial>& Entity::getMaterial() const { return k_material; }
 
+Entity::ColorStorage& Entity::getColorStorage() noexcept { return m_colors; }
+const Entity::ColorStorage& Entity::getColorStorage() const noexcept { return m_colors; }
 
 //// ---- TransformableEntity ---- ////
 
@@ -173,12 +179,13 @@ glm::mat3x3 TransformedEntity::getNormalMatrix() const { return k_mat_normal; }
 
 //// ---- Entity2D ---- ////
 
-Entity2D::Entity2D() : id(-1) { }
+Entity2D::Entity2D() : IDObject() { }
 
 Entity2D::Entity2D(int id,
     const std::shared_ptr<GLModel>& model,
-    const std::shared_ptr<GLTexture2D>& texture)
-    : id(id), model(model), texture(texture) { }
+    const std::shared_ptr<GLTexture2D>& texture,
+    const ColorStorage &colors)
+    : IDObject(id), model(model), texture(texture), m_colors(colors) { }
 
 
 const std::shared_ptr<GLTexture2D> Entity2D::getTexture() const { return texture; }
@@ -187,8 +194,8 @@ const std::shared_ptr<GLModel> Entity2D::getModel() const { return model; }
 void Entity2D::setTexture(const std::shared_ptr<GLTexture2D> texture) { this->texture = texture; }
 void Entity2D::setModel(const std::shared_ptr<GLModel> model) { this->model = model; }
 
-int Entity2D::getID() const { return id; }
-void Entity2D::setID(int pID) { this->id = pID; }
+Entity::ColorStorage& Entity2D::getColorStorage() noexcept { return m_colors; }
+const Entity::ColorStorage& Entity2D::getColorStorage() const noexcept { return m_colors; }
 
 // ---- TransformedEntity2D ---- //
 TransformedEntity2D::TransformedEntity2D()
@@ -210,9 +217,11 @@ TransformableEntity2D::TransformableEntity2D()
 TransformableEntity2D::TransformableEntity2D(int id,
     const std::shared_ptr<GLModel> &model,
     const std::shared_ptr<GLTexture2D> &texture,
+    const ColorStorage &colorStorage,
     const glm::vec2 &position, const glm::vec2 &scale,
     float rotation
-) : Entity2D(id, model, texture), entityPosition(position),
+) : Entity2D(id, model, texture, colorStorage),
+    entityPosition(position),
     entityScale(scale), entityRotation(rotation) { }
 
 TransformableEntity2D& TransformableEntity2D::setPosition(const glm::vec2 &position) { entityPosition = position; return *this; }
@@ -228,7 +237,8 @@ const glm::vec2& TransformableEntity2D::getPosition() const { return entityPosit
 const glm::vec2& TransformableEntity2D::getScale() const { return entityScale; }
 float TransformableEntity2D::getRotation() const { return entityRotation; }
 
-glm::mat3x3 TransformableEntity2D::calculateTransformationMatrix3D() const {
+glm::mat3x3 TransformableEntity2D::calculateTransformationMatrix3D() const
+{
     glm::mat3x3 transform(1.0f);
     transform = glm::translate(transform, entityPosition);
     transform = glm::rotate(transform, entityRotation);
@@ -253,10 +263,11 @@ glm::mat4x4 TransformableEntity2D::getTransformationMatrix() const {
 MatrixBufferedEntity2D::MatrixBufferedEntity2D(int id,
     const std::shared_ptr<GLModel> &model,
     const std::shared_ptr<GLTexture2D> &texture,
+    const ColorStorage& colorStorage,
     const glm::vec2 &position,
     const glm::vec2 &scale,
     float rotation) : TransformableEntity2D(
-        id, model, texture, position, scale, rotation) { }
+        id, model, texture, colorStorage, position, scale, rotation) { }
 
 TransformableEntity2D& MatrixBufferedEntity2D::setPosition(const glm::vec2 &position) { dirty(); return TransformableEntity2D::setPosition(position); }
 TransformableEntity2D& MatrixBufferedEntity2D::setScale(const glm::vec2 &scale) { dirty(); return TransformableEntity2D::setScale(scale); }

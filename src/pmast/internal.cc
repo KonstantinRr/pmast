@@ -23,16 +23,53 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-#pragma once
+#include <pmast/internal.hpp>
 
-#ifndef NYREM_ENGINE_H
-#define NYREM_ENGINE_H
+AtomicLock::AtomicLock(bool doLock) {
+	this->doLock = doLock;
+}
 
-#include <engine/internal.hpp>
-#include <engine/camera.hpp>
-#include <engine/entity.hpp>
-#include <engine/glmodel.hpp>
-#include <engine/resource.hpp>
-#include <engine/shader.hpp>
-
+void AtomicLock::lock() noexcept {
+	if (doLock) {
+		for (;;) {
+			// Optimistically assume the lock is free on first the try
+			if (!plock.exchange(true, std::memory_order_acquire)) {
+				return;
+			}
+			// Wait for lock to be released without generating cache misses
+			while (plock.load(std::memory_order_relaxed)) {
+				// Issue X86 PAUSE or ARM YIELD instruction to reduce contention between
+				// hyper-threads
+#if defined(__GNUC__)
+				__builtin_ia32_pause();
+#elif defined(_MSC_VER )
+				_mm_pause();
 #endif
+			}
+		}
+	}
+}
+
+bool AtomicLock::try_lock() noexcept {
+	// First do a relaxed load to check if lock is free in order to prevent
+	// unnecessary cache misses if someone does while(!try_lock())
+	return !plock.load(std::memory_order_relaxed) &&
+		!plock.exchange(true, std::memory_order_acquire);
+}
+
+
+void AtomicLock::unlock() noexcept {
+	if (doLock) {
+		plock.store(false, std::memory_order_release);
+	}
+}
+
+bool SizeObject::hasManagedSize() const
+{
+	return false;
+}
+
+size_t SizeObject::getManagedSize() const
+{
+	return 0;
+}

@@ -23,15 +23,22 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
+#pragma once
+
+#ifndef NYREM_UTIL_HPP
+#define NYREM_UTIL_HPP
+
 #include <engine/internal.hpp>
 
 #include <vector>
 #include <string>
 
-#ifdef NYREM_NAMESPACE
-namespace nyrem {
-#endif
+NYREM_NAMESPACE_BEGIN
 
+/// <summary>
+/// This class implements a fast string stream (FastSStream).
+/// 
+/// </summary>
 class FastSStream {
 public:
 	void add(const char *string);
@@ -43,6 +50,8 @@ public:
 	std::string generate() const;
 	void clear();
 	inline size_t bufferSize() { return segments.size(); }
+
+	
 
 private:
 	enum DataType {
@@ -72,6 +81,91 @@ private:
 	std::vector<DataSegment> segments;
 };
 
-#ifdef NYREM_NAMESPACE
-}
+template<typename Type>
+class DoubleQueue {
+public:
+
+	DoubleQueue(size_t size) { }
+
+	void push_front(const Type& type) { }
+	void push_front(Type &&type) { }
+
+	void push_back(const Type& type) { }
+	void push_back(Type &&type) { }
+
+	template<typename ...Args>
+	void emplace_back(Args&&... args) { }
+
+	template<typename ...Args>
+	void emplace_front(Args&&... args) { }
+
+	void pop_front() { }
+	void pop_back() { }
+
+	bool empty() const noexcept { return true; }
+
+protected:
+	Type *m_data;
+};
+
+template<typename Type>
+class BlockAllocator {
+public:
+	union Block {
+		Type value;
+		Block *next;
+	};
+
+	BlockAllocator(size_t size) : 
+		m_maxSize(size), m_allocated(0) {
+		// allocates the block
+		m_data = new Block[maxSize];
+		// initializes the pointers to the first and last element
+		m_first = m_data;
+		Block *last = m_data + maxSize - 1;
+		// all elements point to the next element
+		for (Block *ptr = m_first; ptr != last; ptr++)
+			ptr->next = ptr + 1;
+		// last element points to null indicating the end
+		last->next = nullptr;
+	}
+
+	~BlockAllocator() {
+		delete[] m_data;
+	}
+
+	template<typename ...Args>
+	Type* allocate(Args&&... args) {
+		Type* ptr = &m_first->value;
+		if (ptr == nullptr) {
+			return nullptr; // TODO error handling
+		} else {
+			m_first = m_first->next();
+			m_allocated++;
+			new (ptr) Type(std::forward<Args>(args)...);
+			return ptr;
+		}
+	}
+
+	void deallocate(Type *ptr) {
+		Block *original = reinterpret_cast<Block*>(ptr);
+		if (original >= m_data && original < m_data + maxSize) {
+			// check if the ptr actually belongs to this block of memory
+			Block* tempFirst = m_first;
+			m_first = original;
+			m_first->next = tempFirst;
+			original->~Type();
+			m_allocated--;
+		}
+	}
+
+	inline size_t allocated() { return m_allocated; }
+	inline size_t maxSize() { return m_maxSize; }
+protected:
+	Block *m_data, *m_first;
+	size_t m_maxSize, m_allocated;
+};
+
+NYREM_NAMESPACE_END
+
 #endif

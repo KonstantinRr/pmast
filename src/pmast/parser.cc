@@ -23,7 +23,7 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-#include <pmast/engine.hpp>
+#include <pmast/parser.hpp>
 
 #include <chrono>
 #include <fstream>
@@ -41,9 +41,6 @@
 #include <rapidxml/rapidxml_print.hpp>
 
 #include <fmt/format.h>
-#include <ctpl.h>
-
-#include <pmast/parser.hpp>
 
 using namespace rapidxml;
 using namespace std;
@@ -496,34 +493,27 @@ OSMSegment traffic::parseXMLMap(const ParseArguments &args)
 	info.wayList.resize(sizeWays);
 	info.relationList.resize(sizeRelations);
 
-	ctpl::thread_pool* usedPool;
-	if (args.pool) {
-		// TODO fix this shit
-		usedPool = new ctpl::thread_pool(args.threads);
-	} else {
-		usedPool = new ctpl::thread_pool(args.threads);
-	}
 
 	ParseInfo *infoPtr = &info;
 	{
-		vector<future<bool>> futures(args.threads);
+		vector<bool> futures(args.threads);
 		for (int i = 0; i < args.threads; i++) {
 			LocalParseInfo local;
 			local.start = i;
 			local.stride = args.threads;
-			futures[i] = usedPool->push(ParseTask(infoPtr, local));
+
+			bool result = ParseTask(infoPtr, local)(0);
+			futures[i] = result;
 		}
 
+		/*
 		for (int i = 0; i < args.threads; i++) {
 			try { futures[i].get(); }
 			catch (const std::exception &e) {
 				printf("Got exception from thread %d\n", i);
 			}
 		}
-	}
-
-	if (!args.pool) {
-		delete usedPool;
+		*/
 	}
 
 	// Prints some diagnostics about the program

@@ -29,8 +29,12 @@
 #ifndef LISTENER_HPP
 #define LISTENER_HPP
 
+#include <engine/internal.hpp>
+
 #include <functional>
 #include <vector>
+
+NYREM_NAMESPACE_BEGIN
 
 template<typename Type>
 struct CallbackForm {
@@ -89,5 +93,7 @@ public:
 	bool empty() { return callbacks.empty(); }
 	void clear() { callbacks.clear(); }
 };
+
+NYREM_NAMESPACE_END
 
 #endif

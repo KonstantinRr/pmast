@@ -24,7 +24,6 @@
 /// July 2020
 
 #include <engine/resource.hpp>
-#include <FreeImage.h>
 
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
@@ -43,28 +42,40 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-using namespace nyrem;
+NYREM_USE_NAMESPACE
 
-std::vector<char> nyrem::readFile(const std::string &file) {
+std::vector<char> nyrem::readFile(const std::string &file)
+{
 	spdlog::info("Opening resource {}", file);
 	FILE *f = fopen(file.c_str(), "rb");
 	if (!f) throw std::runtime_error("Could not open File");
 	int rt;
 	rt = fseek(f, 0, SEEK_END);
 	if (rt != 0) throw std::runtime_error("Could not seek file");
-	long fsize = ftell(f);
+	size_t fsize = static_cast<size_t>(ftell(f));
 	rt = fseek(f, 0, SEEK_SET);
 	if (rt != 0) throw std::runtime_error("Could not seek file");
 
 	std::vector<char> data;
-	data.resize(static_cast<size_t>(fsize + 1));
-	fread(data.data(), 1, static_cast<size_t>(fsize), f);
+	data.resize(fsize + 1);
+	size_t readBytes = fread(data.data(), 1, fsize, f);
 	data[fsize] = 0;
+
+	if (readBytes != fsize)
+		throw std::runtime_error("Bytes read did not match file size");
 
 	rt = fclose(f);
 	if (rt != 0) throw std::runtime_error("Could not close file");
 	return data;
 }
+
+std::vector<int> generateIndices(size_t length) {
+	std::vector<int> indices(length);
+	for (size_t i = 0; i < length; i++)
+		indices[i] = i;
+	return indices;
+}
+
 
 // ---- PointVertex ---- //
 template<typename Type>
@@ -430,6 +441,13 @@ void MeshBuilder2D::setColors(const std::vector<glm::vec3>& colors) { this->colo
 void MeshBuilder2D::setVertices(std::vector<glm::vec2>&& vertices) { this->vertices = std::move(vertices); }
 void MeshBuilder2D::setTextureCoords(std::vector<glm::vec2>&& textureCoords) { this->texCoords = std::move(textureCoords); }
 void MeshBuilder2D::setColors(std::vector<glm::vec3>&& colors) { this->colors = std::move(colors); }
+
+void MeshBuilder2D::generateDefaultIndices()
+{
+	v_indices = generateIndices(vertices.size());
+	vt_indices = generateIndices(texCoords.size());
+	vc_indices = generateIndices(colors.size());
+}
 
 void MeshBuilder2D::setVIndices(const std::vector<int> &pv_indices) { this->v_indices = pv_indices; }
 void MeshBuilder2D::setVTIndices(const std::vector<int> &pvt_indices) { this->vt_indices = pvt_indices; }
@@ -798,6 +816,14 @@ void MeshBuilder::setVNIndices(const std::vector<int> &pIndices) { this->vn_indi
 void MeshBuilder::setVTIndices(const std::vector<int> &pIndices) { this->vt_indices = pIndices; }
 void MeshBuilder::setVCIndices(const std::vector<int> &indices) { this->vc_indices = indices; }
 
+void MeshBuilder::generateDefaultIndices()
+{
+	v_indices = generateIndices(vertices.size());
+	vn_indices = generateIndices(normals.size());
+	vt_indices = generateIndices(texcoords.size());
+	vc_indices = generateIndices(colors.size());
+}
+
 const std::vector<glm::vec3>& MeshBuilder::getVertices() const { return vertices; }
 const std::vector<glm::vec3>& MeshBuilder::getNormals() const { return normals; }
 const std::vector<glm::vec2>& MeshBuilder::getTextureCoords() const { return texcoords; }
@@ -852,45 +878,20 @@ MeshBuilder MeshBuilder::fromOBJ(const std::string &filename, const std::string 
 
 MeshBuilder nyrem::loadCube() {
 	MeshBuilder mesh;
-	std::vector<glm::vec3> vertex_buffer = {
-	    glm::vec3(-1.0f,-1.0f,-1.0f),
-	    glm::vec3(-1.0f,-1.0f, 1.0f),
-	    glm::vec3(-1.0f, 1.0f, 1.0f),
-	    glm::vec3(1.0f, 1.0f,-1.0f),
-	    glm::vec3(-1.0f,-1.0f,-1.0f),
-	    glm::vec3(-1.0f, 1.0f,-1.0f),
-	    glm::vec3(1.0f,-1.0f, 1.0f),
-	    glm::vec3(-1.0f,-1.0f,-1.0f),
-	    glm::vec3(1.0f,-1.0f,-1.0f),
-	    glm::vec3(1.0f, 1.0f,-1.0f),
-	    glm::vec3(1.0f,-1.0f,-1.0f),
-	    glm::vec3(-1.0f,-1.0f,-1.0f),
-	    glm::vec3(-1.0f,-1.0f,-1.0f),
-	    glm::vec3(-1.0f, 1.0f, 1.0f),
-	    glm::vec3(-1.0f, 1.0f,-1.0f),
-	    glm::vec3(1.0f,-1.0f, 1.0f),
-	    glm::vec3(-1.0f,-1.0f, 1.0f),
-	    glm::vec3(-1.0f,-1.0f,-1.0f),
-	    glm::vec3(-1.0f, 1.0f, 1.0f),
-	    glm::vec3(-1.0f,-1.0f, 1.0f),
-	    glm::vec3(1.0f,-1.0f, 1.0f),
-	    glm::vec3(1.0f, 1.0f, 1.0f),
-	    glm::vec3(1.0f,-1.0f,-1.0f),
-	    glm::vec3(1.0f, 1.0f,-1.0f),
-	    glm::vec3(1.0f,-1.0f,-1.0f),
-	    glm::vec3(1.0f, 1.0f, 1.0f),
-	    glm::vec3(1.0f,-1.0f, 1.0f),
-	    glm::vec3(1.0f, 1.0f, 1.0f),
-	    glm::vec3(1.0f, 1.0f,-1.0f),
-	    glm::vec3(-1.0f, 1.0f,-1.0f),
-	    glm::vec3(1.0f, 1.0f, 1.0f),
-	    glm::vec3(-1.0f, 1.0f,-1.0f),
-	    glm::vec3(-1.0f, 1.0f, 1.0f),
-	    glm::vec3(1.0f, 1.0f, 1.0f),
-	    glm::vec3(-1.0f, 1.0f, 1.0f),
-	    glm::vec3(1.0f,-1.0f, 1.0f),
+	mesh.vertices = {
+		{-1.0f,-1.0f,-1.0f}, {-1.0f,-1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f},
+		{ 1.0f, 1.0f,-1.0f}, {-1.0f,-1.0f,-1.0f}, {-1.0f, 1.0f,-1.0f},
+		{ 1.0f,-1.0f, 1.0f}, {-1.0f,-1.0f,-1.0f}, { 1.0f,-1.0f,-1.0f},
+		{ 1.0f, 1.0f,-1.0f}, { 1.0f,-1.0f,-1.0f}, {-1.0f,-1.0f,-1.0f},
+		{-1.0f,-1.0f,-1.0f}, {-1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f,-1.0f},
+		{ 1.0f,-1.0f, 1.0f}, {-1.0f,-1.0f, 1.0f}, {-1.0f,-1.0f,-1.0f}, 
+		{-1.0f, 1.0f, 1.0f}, {-1.0f,-1.0f, 1.0f}, { 1.0f,-1.0f, 1.0f},
+		{ 1.0f, 1.0f, 1.0f}, { 1.0f,-1.0f,-1.0f}, { 1.0f, 1.0f,-1.0f},
+		{ 1.0f,-1.0f,-1.0f}, { 1.0f, 1.0f, 1.0f}, { 1.0f,-1.0f, 1.0f},
+		{ 1.0f, 1.0f, 1.0f}, { 1.0f, 1.0f,-1.0f}, {-1.0f, 1.0f,-1.0f},
+		{ 1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f,-1.0f}, {-1.0f, 1.0f, 1.0f},
+		{ 1.0f, 1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f}, { 1.0f,-1.0f, 1.0f},
 	};
-	mesh.vertices = vertex_buffer;
 	mesh.normals.resize(mesh.vertices.size());
 	mesh.texcoords.resize(mesh.vertices.size());
 	return mesh;
@@ -898,10 +899,8 @@ MeshBuilder nyrem::loadCube() {
 
 MeshBuilder nyrem::loadTriangle() {
 	MeshBuilder mesh;
-	mesh.vertices = { { -1.0f, -1.0f, 0.0f },
-		{ 1.0f, -1.0f, 0.0f }, { 0.0f,  1.0f, 0.0f } };
-	mesh.normals = { { 0.0f, 0.0f, 1.0f },
-		{ 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
+	mesh.vertices = { { -1.0f, -1.0f, 0.0f }, { 1.0f, -1.0f, 0.0f }, { 0.0f,  1.0f, 0.0f } };
+	mesh.normals = { { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f } };
 	mesh.texcoords = {{0.0, 0.0}, {1.0, 0.0}, {0.5, 1.0}};
 	mesh.v_indices = { 0, 1, 2 };
 	mesh.vn_indices = { 0, 1, 2 };
@@ -920,12 +919,15 @@ MeshBuilder2D nyrem::loadTriangle2D() {
 
 MeshBuilder2D nyrem::loadRect2D() {
 	MeshBuilder2D mesh;
-	mesh.vertices = {{-1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f},
-		{-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}};
-	mesh.texCoords = { {0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f},
-		{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}};
-	mesh.v_indices = { 0, 1, 2, 3, 4, 5 };
-	mesh.vt_indices = { 0, 1, 2, 3, 4, 5 };
+	mesh.vertices = {
+		{-1.0f, -1.0f}, {1.0f, 1.0f}, {-1.0f, 1.0f},
+		{-1.0f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}
+	};
+	mesh.texCoords = {
+		{0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f},
+		{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}
+	};
+	mesh.generateDefaultIndices();
 	return mesh;
 }
 
@@ -1005,51 +1007,3 @@ DataBlob& DataBlob::operator=(DataBlob &&blob)
 	k_size = std::exchange(blob.k_size, 0);
 	return *this;
 }
-
-BitmapImage::BitmapImage(const std::string &type, const std::string &path)
-{
-	if (type == "PNG") {
-		*this = loadPNG(path);
-	} else {
-		spdlog::error("Warning, unknown image type '{}'", type);
-	}
-}
-
-BitmapImage::~BitmapImage()
-{
-	if (k_image)
-		FreeImage_Unload(k_image);
-}
-
-
-BitmapImage::BitmapImage(BitmapImage &&img)
-	: k_image(std::exchange(img.k_image, nullptr)) { }
-BitmapImage BitmapImage::loadPNG(const std::string &file)
-{
-	BitmapImage image;
-	image.k_image = FreeImage_Load(FIF_PNG, file.c_str(), PNG_DEFAULT);
-
-    if (FreeImage_GetBPP(image.k_image) != 32)
-        image.k_image = FreeImage_ConvertTo32Bits(image.k_image);
-	return image;
-}
-BitmapImage BitmapImage::loadJPG(const std::string &file)
-{
-	BitmapImage img;
-	return img;
-}
-
-BitmapImage& BitmapImage::operator=(BitmapImage &&img)
-{
-	k_image = std::exchange(img.k_image, nullptr);
-	return *this;
-}
-
-DataBlob BitmapImage::exportImage()
-{
-	return DataBlob();
-}
-
-const unsigned char* BitmapImage::data() const { return (unsigned char*)FreeImage_GetBits(k_image); }
-size_t BitmapImage::width() const { return FreeImage_GetWidth(k_image); }
-size_t BitmapImage::height() const { return FreeImage_GetHeight(k_image); }

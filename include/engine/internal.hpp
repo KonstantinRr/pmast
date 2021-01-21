@@ -103,7 +103,18 @@ bool lt_check_gl_error(const char* cmd, int line, const char* file);
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
 
-namespace nyrem {
+#ifdef NYREM_NAMESPACE
+    #define NYREM_NAMESPACE_BEGIN namespace nyrem {
+    #define NYREM_NAMESPACE_END }
+    #define NYREM_USE_NAMESPACE using namespace nyrem;
+#else
+    #define NYREM_NAMESPACE_BEGIN
+    #define NYREM_NAMESPACE END
+    #define NYREM_USE_NAMESPACE
+#endif
+
+NYREM_NAMESPACE_BEGIN
+
 	// ---- Matrices ---- //
 	using mat4x4 = glm::mat4x4;
 	using mat3x3 = glm::mat3x3;
@@ -120,6 +131,7 @@ namespace nyrem {
 	using dvec4 = glm::dvec4;
 	using dvec3 = glm::dvec3;
 	using dvec2 = glm::dvec2;
-}
+
+NYREM_NAMESPACE_END
 
 #endif // !NYREM_MODULE_HPP

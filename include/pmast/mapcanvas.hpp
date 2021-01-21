@@ -28,21 +28,22 @@
 #ifndef MAPCANVAS_HPP
 #define MAPCANVAS_HPP
 
-#include "engine.hpp"
-#include "agent.hpp"
-#include "osm.hpp"
+#include <pmast/internal.hpp>
+#include <pmast/agent.hpp>
+#include <pmast/osm.hpp>
 
-#include "engine/listener.hpp"
-#include "engine/shader.hpp"
-#include "engine/window.hpp"
+#include <engine/listener.hpp>
+#include <engine/shader.hpp>
+#include <engine/window.hpp>
 
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 
 namespace traffic {
 	
+
+class Agent; // externally defined Agent class
 class Route; // externally defined Route class
 
 /// <summary>
@@ -105,7 +106,6 @@ public:
 	void resetView();
 
 	// ---- Transformations ---- //
-
 	// -- Window <-> View -- //
 	glm::dvec2 windowToView(glm::ivec2 vec) const;
 	glm::ivec2 viewToWindow(glm::dvec2 vec) const;
@@ -128,15 +128,17 @@ public:
 	Rect rect() const; 
 
 	// ---- Callbacks ---- //
-	inline Listener<void(glm::dvec2)>& cb_leftclick() { return m_cb_leftclick; }
-	inline Listener<void(glm::dvec2)>& cb_rightclick() { return m_cb_rightclick; }
-	inline Listener<void(glm::dvec2)>& cb_map_moved() { return m_cb_map_moved; }
-	inline Listener<void(glm::dvec2)>& cb_cursor_moved() { return m_cb_cursor_moved; }
-	inline Listener<void(traffic::Rect)>& cb_view_changed() { return m_cb_view_changed; }
-	inline Listener<void(double)>& cb_zoom_changed() { return m_cb_zoom_changed; }
-	inline Listener<void(double)>& cb_rotation_changed() { return m_cb_rotation_changed; }
+	inline nyrem::Listener<void(glm::dvec2)>& cb_leftclick() { return m_cb_leftclick; }
+	inline nyrem::Listener<void(glm::dvec2)>& cb_rightclick() { return m_cb_rightclick; }
+	inline nyrem::Listener<void(glm::dvec2)>& cb_map_moved() { return m_cb_map_moved; }
+	inline nyrem::Listener<void(glm::dvec2)>& cb_cursor_moved() { return m_cb_cursor_moved; }
+	inline nyrem::Listener<void(traffic::Rect)>& cb_view_changed() { return m_cb_view_changed; }
+	inline nyrem::Listener<void(double)>& cb_zoom_changed() { return m_cb_zoom_changed; }
+	inline nyrem::Listener<void(double)>& cb_rotation_changed() { return m_cb_rotation_changed; }
 
 	std::string info();
+
+	void setAgentList(const std::vector<Agent> &agentList);
 
 protected:
 	// ---- Mesh access ---- //
@@ -154,27 +156,35 @@ protected:
 
 	// ---- Member variables ---- //
 
-	Listener<void(glm::dvec2)> m_cb_leftclick;		// triggered on left click
-	Listener<void(glm::dvec2)> m_cb_rightclick;		// triggered on right clcik
-	Listener<void(glm::dvec2)> m_cb_map_moved;		// triggered if map moves
-	Listener<void(glm::dvec2)> m_cb_cursor_moved;	// triggered if cursor moves
-	Listener<void(traffic::Rect)> m_cb_view_changed;// triggered if view changes
-	Listener<void(double)> m_cb_zoom_changed;		// triggered if zoom changes
-	Listener<void(double)> m_cb_rotation_changed;	// triggered if rotation changes
+	nyrem::Listener<void(glm::dvec2)> m_cb_leftclick;		// triggered on left click
+	nyrem::Listener<void(glm::dvec2)> m_cb_rightclick;		// triggered on right clcik
+	nyrem::Listener<void(glm::dvec2)> m_cb_map_moved;		// triggered if map moves
+	nyrem::Listener<void(glm::dvec2)> m_cb_cursor_moved;	// triggered if cursor moves
+	nyrem::Listener<void(traffic::Rect)> m_cb_view_changed; // triggered if view changes
+	nyrem::Listener<void(double)> m_cb_zoom_changed;		// triggered if zoom changes
+	nyrem::Listener<void(double)> m_cb_rotation_changed;	// triggered if rotation changes
 
 	// contains the overall map mesh as well as the highway mesh
-	std::shared_ptr<nyrem::TransformedEntity2D>
-		l_mesh_map, l_mesh_highway;
+	std::shared_ptr<nyrem::TransformedEntity2D> l_mesh_map, l_mesh_highway;
 	// contains a list of routes that are rendered on the screen
 	std::vector<std::shared_ptr<nyrem::TransformedEntity2D>> l_mesh_routes;
+
+	std::vector<std::shared_ptr<nyrem::TransformableEntity2D>> m_entities;
+
+	const std::vector<Agent> *m_agentList;
 
 	// ---- RenderPipeline ---- //
 	nyrem::RenderPipeline l_pipeline;
 	std::shared_ptr<nyrem::LineMemoryShader> l_shader;
+	std::shared_ptr<nyrem::RectShader> rect_shader;
+	std::shared_ptr<nyrem::RenderComponent<
+		nyrem::RectStageBuffer,
+		nyrem::RectShader>> rect_comp;
 	std::shared_ptr<nyrem::RenderComponent<
 		nyrem::LineStageBuffer,
 		nyrem::LineMemoryShader>> l_comp;
 
+	std::shared_ptr<nyrem::GLModel> m_model;
 
 	nyrem::SizedObject *l_size;
 

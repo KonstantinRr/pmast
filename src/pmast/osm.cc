@@ -23,15 +23,13 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-#include <pmast/engine.hpp>
+#include <pmast/osm.hpp>
 
 #include <math.h>
 #include <memory>
 #include <vector>
 #include <string>
 #include <algorithm>
-
-#include <pmast/osm.hpp>
 
 using namespace std;
 using namespace traffic;
@@ -818,7 +816,7 @@ void traffic::OSMMap::recalculateChunks()
 	for (const OSMNode& nd : *(m_map->getNodes()))
 	{
 		size_t location = toStore(nd.getLat(), nd.getLon());
-		m_chunks[location].addNode(nd.getID());
+		m_chunks[location].addBack(nd.getID());
 	}
 	*/
 }

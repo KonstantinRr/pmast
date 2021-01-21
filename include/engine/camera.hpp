@@ -28,12 +28,9 @@
 #ifndef NYREM_CAMERA_H
 #define NYREM_CAMERA_H
 
-#include "internal.hpp"
-#include <glm/glm.hpp>
+#include <engine/internal.hpp>
 
-#ifdef NYREM_NAMESPACE
-namespace nyrem {
-#endif
+NYREM_NAMESPACE_BEGIN
 
 /// <summary>
 /// General interface for all camera objects. Cameras can be used to perform arbitrary
@@ -224,7 +221,12 @@ public:
 	Camera3D& move(const vec3& model) noexcept;
 
 	// ---- Complex Functions ---- //
+
+	/// <summary>Calculates the camera's view direction</summary>
+	/// <returns>The view direction vector</returns>
 	vec3 getViewDirection() const noexcept;
+	/// <summary>Calculates the camera's cross direction vector.</summary>
+	/// <returns>The cross dimensional vector</returns>
 	vec3 getViewCrossDirection() const noexcept;
 
 	/// <summary>Overriden method from Camera::viewMatrix</summary>
@@ -240,6 +242,7 @@ public:
 	/// following order: 1. translation, 2. rotation.
 	/// </summary>
 	mat4x4 calculateViewMatrix() const noexcept;
+
 	/// <summary>
 	/// Calculates the projection matrix given by the render parameters
 	/// </summary>
@@ -254,34 +257,43 @@ protected:
 /// Subclass inheriting from Camera3D.
 /// The camera stores its own transformation matrix
 /// that is updated whenever a parameter is changed.
+/// </summary>
 class MatrixBufferedCamera3D : public Camera3D {
 public:
-	/// Creates a buffered camera using the neccessary render settings.
-	/// Position and rotation is set to the default value 0.
 	/// nearPlane:      The camera's near plane
 	/// farPlane:       The camera's far plane
 	/// fov:            The field of view angle in radians
 	/// aspectRation:   The viewports's aspect ratio
+	/// 
+	
+	/// <summary>
+	/// Creates a buffered camera using the neccessary render settings.
+	/// Position and rotation is set to the default value 0.
+	/// </summary>
+	/// <param name="nearPlane">The camera's near plane</param>
+	/// <param name="farPlane">The camera's far plane</param>
+	/// <param name="fov">The field of view angle in radians</param>
+	/// <param name="aspectRatio">The viewports's aspect ratio</param>
 	MatrixBufferedCamera3D(
 		float nearPlane, float farPlane,
-		float fov, float aspectRatio);
-
+		float fov, float aspectRatio) noexcept;
+	
+	/// <summary>
 	/// Creates a buffered camera using the neccessary render settings
 	/// with a custom position and rotation.
-	/// nearPlane:      The camera's near plane
-	/// farPlane:       The camera's far plane
-	/// fov:            The field of view angle in radians
-	/// aspectRation:   The viewport's aspect ratio
-	/// position:       The camera's position
-	/// rotation:       The camera's rotation
+	/// </summary>
+	/// <param name="nearPlane">The camera's near plane</param>
+	/// <param name="farPlane">The camera's far plane</param>
+	/// <param name="fov">The field of view angle in radians</param>
+	/// <param name="aspectRatio">The viewport's aspect ratio</param>
+	/// <param name="position">The viewport's aspect ratio</param>
+	/// <param name="rotation">The camera's rotation</param>
 	MatrixBufferedCamera3D(
 		float nearPlane, float farPlane,
 		float fov, float aspectRatio,
 		const glm::vec3& position,
-		const glm::vec3& rotation);
+		const glm::vec3& rotation) noexcept;
 
-	/// Creates a camera using the neccessary render settings
-	/// with a custom position and rotation.
 	/// nearPlane:      The camera's near plane
 	/// farPlane:       The camera's far plane
 	/// fov:            The field of view angle in radians
@@ -289,55 +301,64 @@ public:
 	/// roll:           The camera's roll angle. Same as rotation[0]
 	/// pitch:          The camera's pitch angle. Same as rotation[1]
 	/// yaw:            The camera's yaw angle. Same as rotation[2]
+ 
+	/// <summary>
+	/// Creates a camera using the neccessary render settings
+	/// with a custom position and rotation.
+	/// </summary>
+	/// <param name="nearPlane">The camera's near plane</param>
+	/// <param name="farPlane">The camera's far plane</param>
+	/// <param name="fov">The field of view angle in radians</param>
+	/// <param name="aspectRatio">The viewport's aspect ratio</param>
+	/// <param name="position">The camera's position</param>
+	/// <param name="roll">The camera's roll angle. Same as rotation[0]</param>
+	/// <param name="pitch">The camera's pitch angle. Same as rotation[1]</param>
+	/// <param name="yaw">The camera's yaw angle. Same as rotation[2]</param>
 	MatrixBufferedCamera3D(
 		float nearPlane, float farPlane,
 		float fov, float aspectRatio,
 		const glm::vec3& position,
-		float roll, float pitch, float yaw);
+		float roll, float pitch, float yaw) noexcept;
 
-	virtual Camera3D& setNearPlane(float nearPlane);
-	virtual Camera3D& setFarPlane(float farPlane);
-	virtual Camera3D& setFOV(float fov);
-	virtual Camera3D& setAspectRatio(float aspect);
-	virtual Camera3D& setAspectRatio(int width, int height);
+	Camera3D& setNearPlane(float nearPlane) noexcept;
+	Camera3D& setFarPlane(float farPlane) noexcept;
+	Camera3D& setFOV(float fov) noexcept;
+	Camera3D& setAspectRatio(float aspect) noexcept;
+	Camera3D& setAspectRatio(int width, int height) noexcept;
 
 	// Camera3D angles
-	virtual Camera3D& setRoll(float roll);
-	virtual Camera3D& setPitch(float pitch);
-	virtual Camera3D& setYaw(float yaw);
-	virtual Camera3D& changeRoll(float roll);
-	virtual Camera3D& changePitch(float pitch);
-	virtual Camera3D& changeYaw(float yaw);
-	virtual Camera3D& rotate(const glm::vec3& model);
-	virtual Camera3D& setRotation(const glm::vec3& rotation);
+	Camera3D& setRoll(float roll) noexcept;
+	Camera3D& setPitch(float pitch) noexcept;
+	Camera3D& setYaw(float yaw) noexcept;
+	Camera3D& changeRoll(float roll) noexcept;
+	Camera3D& changePitch(float pitch) noexcept;
+	Camera3D& changeYaw(float yaw) noexcept;
+	Camera3D& rotate(const glm::vec3& model) noexcept;
+	Camera3D& setRotation(const glm::vec3& rotation) noexcept;
 
-	virtual Camera3D& setX(float x);
-	virtual Camera3D& setY(float y);
-	virtual Camera3D& setZ(float z);
-	virtual Camera3D& move(const glm::vec3& model);
-	virtual Camera3D& setPosition(const glm::vec3& position);
+	Camera3D& setX(float x) noexcept;
+	Camera3D& setY(float y) noexcept;
+	Camera3D& setZ(float z) noexcept;
+	Camera3D& move(const glm::vec3& model) noexcept;
+	Camera3D& setPosition(const glm::vec3& position) noexcept;
 
-	virtual glm::mat4x4 viewMatrix() const override;
-	virtual glm::mat4x4 projectionMatrix() const override;
+	mat4x4 viewMatrix() const noexcept override;
+	mat4x4 projectionMatrix() const noexcept override;
 
-	void rebuildProjection() const;
-	void rebuildView() const;
+	void rebuildProjection() const noexcept;
+	void rebuildView() const noexcept;
 
-	void dirtyProjection(bool value = true) const;
-	void dirtyView(bool value = true) const;
+	void dirtyProjection(bool value = true) const noexcept;
+	void dirtyView(bool value = true) const noexcept;
 
-	bool isDirtyView() const;
-	bool isDirtyProjection() const;
+	bool isDirtyView() const noexcept;
+	bool isDirtyProjection() const noexcept;
+
 protected:
-	struct MatrixBuffer {
-		glm::mat4x4 viewMatrix = glm::mat4x4(1.0f);
-		glm::mat4x4 projectionMatrix = glm::mat4x4(1.0f);
-		bool hasViewChange = true;
-		bool hasProjectionChange = true;
-	};
-
-	std::unique_ptr<MatrixBuffer> k_buffer
-		= std::make_unique<MatrixBuffer>();
+	mutable mat4x4 m_viewMatrix = mat4x4(1.0f);
+	mutable mat4x4 m_projectionMatrix = mat4x4(1.0f);
+	mutable bool m_hasViewChange = true;
+	mutable bool m_hasProjectionChange = true;
 };
 
 //// ---- Camera2D ---- ////
@@ -346,29 +367,29 @@ class Camera2D : public Camera {
 public:
 	Camera2D(
 		const glm::vec2& position = { 0.0f, 0.0f },
-		float rotation = 0.0f);
+		float rotation = 0.0f) noexcept;
 	virtual ~Camera2D() = default;
 
-	float getX() const;
-	float getY() const;
-	const glm::vec2& getPosition() const;
-	float getRotation() const;;
+	float getX() const noexcept;
+	float getY() const noexcept;
+	const glm::vec2& getPosition() const noexcept;
+	float getRotation() const noexcept;
 
-	virtual void setX(float x);
-	virtual void setY(float y);
-	virtual void setPosition(float x, float y);
-	virtual void setPosition(const glm::vec2& pos);
+	void setX(float x) noexcept;
+	void setY(float y) noexcept;
+	void setPosition(float x, float y) noexcept;
+	void setPosition(const glm::vec2& pos) noexcept;
 
-	virtual void setRotation(float rotation);
+	void setRotation(float rotation) noexcept;
 
-	virtual void move(const glm::vec2& pos);
-	virtual void rotate(float rotation);
+	void move(const glm::vec2& pos) noexcept;
+	void rotate(float rotation) noexcept;
 
-	glm::mat4x4 calculateViewMatrix() const;
-	glm::mat4x4 calculateProjectionMatrix() const;
+	mat4x4 calculateViewMatrix() const noexcept;
+	mat4x4 calculateProjectionMatrix() const noexcept;
 
-	virtual glm::mat4x4 viewMatrix() const;
-	virtual glm::mat4x4 projectionMatrix() const;
+	mat4x4 viewMatrix() const noexcept;
+	mat4x4 projectionMatrix() const noexcept;
 
 protected:
 	float k_rotation;
@@ -380,33 +401,29 @@ class MatrixBufferedCamera2D : public Camera2D {
 public:
 	MatrixBufferedCamera2D(
 		const glm::vec2& position = { 0.0f, 0.0f },
-		float rotation = 0.0f);
+		float rotation = 0.0f) noexcept ;
 	virtual ~MatrixBufferedCamera2D() = default;
 
-	virtual void setX(float x);
-	virtual void setY(float y);
-	virtual void setPosition(float x, float y);
-	virtual void setPosition(const glm::vec2& pos);
+	virtual void setX(float x) noexcept;
+	virtual void setY(float y) noexcept;
+	virtual void setPosition(float x, float y) noexcept;
+	virtual void setPosition(const glm::vec2& pos) noexcept;
 
-	virtual void setRotation(float rotation);
+	virtual void setRotation(float rotation) noexcept;
 
-	virtual void move(const glm::vec2& pos);
-	virtual void rotate(float rotation);
+	virtual void move(const glm::vec2& pos) noexcept;
+	virtual void rotate(float rotation) noexcept;
 
-	bool isDirty() const;
-	void dirty(bool value = true) const;
-	void rebuild() const;
+	bool isDirty() const noexcept;
+	void dirty(bool value = true) const noexcept;
+	void rebuild() const noexcept;
 
-	virtual glm::mat4x4 viewMatrix() const;
-	virtual glm::mat4x4 projectionMatrix() const;
+	virtual mat4x4 viewMatrix() const noexcept;
+	virtual mat4x4 projectionMatrix() const noexcept;
 protected:
-	struct MatrixBuffer {
-		glm::mat4x4 k_mat_view = glm::mat4x4(1.0f);
-		glm::mat4x4 k_mat_proj = glm::mat4x4(1.0f);
-		bool k_dirty = true;
-	};
-	std::unique_ptr<MatrixBuffer> k_buffer
-		= std::make_unique<MatrixBuffer>();
+	mutable mat4x4 m_viewMatrix = glm::mat4x4(1.0f);
+	mutable mat4x4 m_projMatrix = glm::mat4x4(1.0f);
+	mutable bool m_dirty = true;
 };
 
 class FreeCamera : public Camera3D {
@@ -415,8 +432,6 @@ public:
 	virtual ~FreeCamera() = default;
 };
 
-#ifdef NYREM_NAMESPACE
-} // namespace nyrem
-#endif
+NYREM_NAMESPACE_END
 
 #endif // CAMERA_H

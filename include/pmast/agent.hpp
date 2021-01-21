@@ -28,7 +28,8 @@
 #ifndef AGENT_H
 #define AGENT_H
 
-#include "engine.hpp"
+#include <pmast/internal.hpp>
+#include <pmast/osm_graph.hpp>
 #include <engine/thread.hpp>
 
 #include <string>
@@ -45,6 +46,79 @@ namespace traffic
     class TrafficGraphNode; // externally defined
     class TrafficGraph;     // externally defined
 
+    using AgentRef = Agent*;
+    using WorldRef = World*;
+
+    struct EnvironmentalInfo {
+        /// <summary>
+        /// Stores the global friction coefficient
+        /// </summary>
+        prec_t friction;
+    };
+
+    /// <summary>
+    /// Torque Graph
+    ///          { 
+    /// T(rpm) = {
+    ///.          {
+    /// </summary>
+    struct CarEngine {
+        
+    };
+
+    class PhysicalEntity {
+    public:
+        static constexpr prec_t g = (prec_t)9.81;
+        
+        PhysicalEntity() noexcept;
+        PhysicalEntity(
+            prec_t maxAcceleration, prec_t maxDeceleration,
+            prec_t mass, prec_t tireFric) noexcept;
+
+        prec_t downforce() const noexcept;
+        prec_t speed() const noexcept;
+        prec_t energy() const noexcept;
+
+        prec_t accelerationTime(prec_t newSpeed) const noexcept;
+        prec_t accelerationDistance(prec_t newSpeed) const noexcept;
+
+        prec_t tireFriction() const noexcept;
+        prec_t mass() const noexcept;
+        
+        nyrem::vec2 velocity() noexcept;
+        nyrem::vec2 position() noexcept;
+        const nyrem::vec2& velocity() const noexcept;
+        const nyrem::vec2& position() const noexcept;
+
+    protected:
+        prec_t d_tireFriction;
+
+        /// <summary>
+        /// The maximum acceleration that the car's engine can deliver in m/s^2.
+        /// </summary>
+        prec_t d_maxAcceleration;
+
+        /// <summary>
+        /// The maximum decelleration that the car's brake can deliver in m/s^2
+        /// </summary>
+        prec_t d_maxDecelleration;
+
+        /// <summary>
+        /// The mass of this car. Used for future calculation.
+        /// </summary>
+        prec_t d_mass;
+
+        /// <summary>
+        /// The car's current velocity
+        /// </summary>
+        nyrem::vec2 d_velocity;
+
+        /// <summary>
+        /// The car's current position in plane coordinates
+        /// </summary>
+        nyrem::vec2 d_position;
+    };
+
     /// <summary>
     /// Agents are entities that act in the world to achieve a certain goal. Each agent
     /// has its own set of believes desires and goals that it tries to achieve. Agents
@@ -53,31 +127,67 @@ namespace traffic
     class Agent {
     public:
         // ---- Constructors ---- //
-        Agent(const Agent&) = delete;
-        Agent(Agent&&) = delete;
+        Agent(World &world, TrafficGraph &graph,
+            TrafficGraphNodeIndex begin, TrafficGraphNodeIndex end) noexcept;
 
-        Agent& operator=(const Agent&) = delete;
-        Agent& operator=(Agent&&) = delete;
+        TrafficGraphNodeIndex m_goal() const noexcept;
 
-        ~Agent() = default;
-
-        // ---- Functions ---- //
-
-        void setGoal(int64_t newGoal);
-        int64_t getGoal() const;
+        void determinePath() noexcept;
 
         void update(double dt);
         void makeGreedyChoice();
-        TrafficGraphEdge* edge();
 
+        PhysicalEntity& physical() noexcept;
+        const PhysicalEntity& physical() const noexcept;
     protected:
         // ---- Member definitions ---- //
-        std::shared_ptr<World> world;
-        TrafficGraphEdge* m_edge;
-        size_t m_begin;
-        size_t m_end;
+        
+        PhysicalEntity m_physicalEntity;
 
-        int64_t goalID;
+        /// <summary>
+        /// The route that the agent calculated to reach its goal. This route may
+        /// be changed during navigating to the goal by the result of environmental
+        /// changes. The route represents the shortes route to the destination in the
+        /// agent's perception.
+        /// </summary>
+        IndexRoute m_route;
+
+        size_t m_route_point;
+
+        /// <summary>
+        /// Stores a reference to the world the agent is living in. This variable
+        /// should stay constant during runs to ensure the same behaviour. Changing
+        /// the world during simulation runs may lead to unexpected behaviour.
+        /// The world variable is mainly used to give controll back to the WorldHandler
+        /// in case of important events. The agent will use the TrafficGraph for all
+        /// navigation tasks.
+        /// </summary>
+        World* m_world;
+
+        /// <summary>
+        /// Allows the agent to access the traffic network to gain access to all
+        /// navigational tasks.
+        /// </summary>
+        TrafficGraph *m_graph;
+
+        /// <summary>
+        /// Stores the street element that the agent is currently at
+        /// </summary>
+        TrafficGraphEdgeIndex m_edge;
+
+        prec_t m_edgePosition;
+
+        /// <summary>
+        /// Stores the last node that the agent visited.
+        /// </summary>
+        TrafficGraphNodeIndex m_node;
+
+        /// <summary>
+        /// Stores the agent's starting position as well as its destination in the
+        /// traffic graph. The agent's goal is satisfied as soon as it reaches the
+        /// goal node. It will be destroyed by the World handler in that case. 
+        /// </summary>
+        TrafficGraphNodeIndex m_begin, m_end;
     };
 
 
@@ -95,6 +205,8 @@ namespace traffic
         void loadMap(const std::shared_ptr<OSMSegment>& map);
         void loadMap(const std::string &file);
         
+        void createAgent(int64_t startID, int64_t endID);
+
         const std::shared_ptr<OSMSegment>& getMap() const;
         const std::shared_ptr<OSMSegment>& getHighwayMap() const;
         const std::shared_ptr<Graph>& getGraph() const;
@@ -107,6 +219,7 @@ namespace traffic
         std::shared_ptr<OSMSegment> k_highway_map;
 
         std::shared_ptr<Graph> m_graph;
+        std::shared_ptr<TrafficGraph> m_traffic_graph;
         std::vector<Agent> m_agents;
     }; 
 } // namespace traffic

@@ -23,18 +23,16 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-#include <pmast/engine.hpp>
-
-#include <vector>
-#include <limits>
-
-#include <glm/glm.hpp>
-
 #include <pmast/osm.hpp>
 #include <pmast/agent.hpp>
 #include <pmast/osm_mesh.hpp>
 #include <pmast/osm_graph.hpp>
 #include <pmast/geom.hpp>
+
+#include <vector>
+#include <limits>
+
+#include <glm/glm.hpp>
 
 #define USE_OPENGL
 

@@ -137,13 +137,14 @@ int main(int argc, char** argv)
 	auto world = std::make_shared<World>(manager.get());
 
 	auto m_canvas = std::make_shared<MapCanvas>(world->getMap());
+	m_canvas->setAgentList(world->getAgents());
 
 	// Loads the default map
 	bool loadDefault = true;
 	if (loadDefault) {
 		ParseTimings timings;
 		ParseArguments args;
-		args.file = "maps/warendorf.xmlmap";
+		args.file = "assets/warendorf.xmlmap";
 		args.threads = 8;
 		args.pool = manager.get();
 		args.timings = &timings;
@@ -209,10 +210,10 @@ int main(int argc, char** argv)
 			m_canvas->applyTranslation({0.0, translateSpeed});
 	});
 
-	bool hasStart;
-	bool hasEnd;
-	glm::dvec2 start;
-	glm::dvec2 end;
+	bool hasStart = false;
+	bool hasEnd = false;
+	glm::dvec2 start{ 0.0 };
+	glm::dvec2 end{ 0.0 };
 
 	input.callbackKey(NYREM_KEY_R).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED) {
@@ -231,7 +232,7 @@ int main(int argc, char** argv)
 		}
 	});
 	input.callbackKey(NYREM_KEY_ENTER).listen([&](KeyEvent e) {
-		if (e.action == KEYSTATUS_PRESSED) {
+		if (e.action == KEYSTATUS_PRESSED && hasStart && hasEnd) {
 			auto& graph = world->getGraph();
 			GraphNode& idStart = graph->findClosestNode(Point(start.x, start.y));
 			GraphNode& idStop = graph->findClosestNode(Point(end.x, end.y));
@@ -241,6 +242,13 @@ int main(int argc, char** argv)
 				std::cout << "Node: " << id << "\n";
 			}
 			m_canvas->loadRoute(r, world->getHighwayMap());
+		}
+	});
+	input.callbackKey(NYREM_KEY_H).listen([&](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED && hasStart && hasEnd) {
+			auto& graph = world->getGraph();
+			GraphNode& idStart = graph->findClosestNode(Point(start.x, start.y));
+			GraphNode& idStop = graph->findClosestNode(Point(end.x, end.y));
 		}
 	});
 

@@ -28,18 +28,17 @@
 #ifndef NYREM_GLMODEL_HPP
 #define NYREM_GLMODEL_HPP
 
-#include "internal.hpp"
-#include "graphics.hpp"
-#include "resource.hpp"
+#include <engine/internal.hpp>
+#include <engine/graphics.hpp>
+#include <engine/resource.hpp>
+
+#include <glm/glm.hpp>
 
 #include <memory>
 #include <vector>
 #include <string>
 
-#include <glm/glm.hpp>
-
-
-namespace nyrem {
+NYREM_NAMESPACE_BEGIN
 
 enum ModelType {
     VERTEX,                 // struct Vertex
@@ -101,7 +100,7 @@ public:
     GLTexture2D(const ImageRGB8 &image);
     GLTexture2D(const ImageBGR8 &image);
     GLTexture2D(const ImageRGBA8 &image);
-    GLTexture2D(const BitmapImage &image);
+    //GLTexture2D(const BitmapImage &image);
 
     ~GLTexture2D();
 
@@ -121,6 +120,6 @@ public:
     const glm::vec4& getMaterial() const;
 };
 
-}
+NYREM_NAMESPACE_END
 
 #endif // NYREM_GLMODEL_HPP

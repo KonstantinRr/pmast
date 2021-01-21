@@ -25,27 +25,142 @@
 
 #include <glm/glm.hpp>
 
-#include <pmast/engine.hpp>
 #include <pmast/agent.hpp>
 #include <pmast/parser.hpp>
 #include <pmast/osm.hpp>
 #include <pmast/osm_graph.hpp>
 #include <pmast/geom.hpp>
 
-#include <ctpl.h>
 #include <thread>
 
 using namespace traffic;
 using namespace glm;
 using namespace std;
 
+// ---- PhysicalEntity ---- //
+
+PhysicalEntity::PhysicalEntity() noexcept :
+    d_mass(prec_t(1000)), d_velocity(prec_t(0)),
+    d_maxDecelleration(prec_t(0.8) * g),
+    d_maxAcceleration(prec_t(0.3) * g),
+    d_tireFriction(prec_t(1.0)) {
+
+}
+
+PhysicalEntity::PhysicalEntity(
+    prec_t maxAcceleration, prec_t maxDeceleration,
+    prec_t mass, prec_t tireFric) noexcept :
+    d_mass(mass), d_velocity(prec_t(0)),
+    d_maxDecelleration(maxDeceleration),
+    d_maxAcceleration(maxAcceleration),
+    d_tireFriction(tireFric)
+{
+
+}
+
+prec_t PhysicalEntity::downforce() const noexcept { return g * d_mass; }
+prec_t PhysicalEntity::speed() const noexcept { return glm::length(d_velocity); }
+prec_t PhysicalEntity::energy() const noexcept {
+    prec_t currentSpeed = speed();
+    return d_mass * currentSpeed * currentSpeed;
+}
+
+prec_t PhysicalEntity::accelerationTime(prec_t newSpeed) const noexcept {
+    prec_t currentSpeed = speed();
+    if (newSpeed > currentSpeed) {
+        // we want to accelerate
+        return (newSpeed - currentSpeed) / d_maxAcceleration;
+    }
+    if (newSpeed < currentSpeed) {
+        return (currentSpeed - newSpeed) / d_maxDecelleration;
+    }
+    return prec_t(0.0); // we are already at the given distance
+}
+
+prec_t PhysicalEntity::accelerationDistance(prec_t newSpeed) const noexcept {
+    prec_t currentSpeed = speed();
+    if (newSpeed > currentSpeed) { // we want to accelerate
+        prec_t time = (newSpeed - currentSpeed) / d_maxAcceleration;
+        return currentSpeed * time + 0.5 * d_maxAcceleration * time * time;
+    }
+    if (newSpeed < currentSpeed) { // we want to decellerate
+        prec_t time = (currentSpeed - newSpeed) / d_maxDecelleration;
+        return currentSpeed * time - 0.5 * d_maxDecelleration * time * time; 
+    }
+    return prec_t(0.0); // we are already at the given distance
+}
+
+prec_t PhysicalEntity::tireFriction() const noexcept { return d_tireFriction; }
+prec_t PhysicalEntity::mass() const noexcept { return d_mass; }
+const nyrem::vec2& PhysicalEntity::velocity() const noexcept { return d_velocity; }
+const nyrem::vec2& PhysicalEntity::position() const noexcept { return d_position; }
+nyrem::vec2 PhysicalEntity::velocity() noexcept { return d_velocity; }
+nyrem::vec2 PhysicalEntity::position() noexcept { return d_position; }
+
 // ---- Agent ---- //
+Agent::Agent(World& world, TrafficGraph& graph,
+    TrafficGraphNodeIndex begin, TrafficGraphNodeIndex end) noexcept :
+    m_world(&world), m_graph(&graph), m_begin(begin), m_end(end),
+    m_node(begin), m_edge(nullIndex),  m_edgePosition(prec_t(0)) {
+}
 
-void Agent::setGoal(int64_t newGoal) { goalID = newGoal; }
-int64_t Agent::getGoal() const { return goalID; }
+PhysicalEntity& Agent::physical() noexcept { return m_physicalEntity; }
+const PhysicalEntity& Agent::physical() const noexcept { return m_physicalEntity; }
 
-void Agent::update(double dt) {
-    
+void Agent::determinePath() noexcept
+{
+}
+
+TrafficGraphNodeIndex Agent::m_goal() const noexcept { return m_end; }
+
+void Agent::update(double dt)
+{
+    if (m_node == m_end) {
+        // we reached our destination, give back controll to the WorldHandler
+        __debugbreak();
+        return; 
+    }
+
+    // check if we have a route to our destination.
+    if (!m_route.exists()) {
+        m_route = m_graph->findIndexRoute(m_node, m_end);
+        m_route_point = 0; // we start at the beginning
+        if (!m_route.exists()) {
+            // there is no possible way to reach the goal
+            // => give back control to the WorldHandler
+            __debugbreak();
+            return;
+        }
+    }
+
+
+
+    // we have made sure that a route exists
+    if (m_edge != nullIndex) {
+        TrafficGraphNode *node = &m_graph->findNodeByIndex(m_node);
+        TrafficGraphEdge *edge = &m_graph->findEdgeByIndex(m_node, m_edge);
+        // we are currently driving on an edge
+        prec_t nextPosition = m_edgePosition + m_physicalEntity.speed();
+        while (nextPosition > edge->distance) { // check for overshoot
+            // subtracts the distance to the next node
+            nextPosition -= edge->distance - m_edgePosition;
+
+            // we reached a new new node and need to navigate
+            node = &m_graph->findNodeByIndex(edge->goal);
+            bool navigated = false;
+            // go over all possible edges and check which matches the route
+            for (TrafficGraphEdge& checkEdge : node->connections) {
+                if (checkEdge.goal == m_route[m_route_point]) {
+                    edge = &checkEdge;
+                    navigated = true;
+                }
+            }
+            if (!navigated) {
+                __debugbreak();
+            }
+        }
+        m_edgePosition = nextPosition;
+    }
 }
 
 void Agent::makeGreedyChoice() {
@@ -151,6 +266,11 @@ void traffic::World::loadMap(const std::string& file)
     timings.summary();
 
     loadMap(newMap);
+}
+
+void traffic::World::createAgent(int64_t startID, int64_t endID)
+{
+    m_agents.push_back(Agent(*this, *m_traffic_graph, startID, endID));
 }
 
 bool traffic::World::hasMap() const noexcept { return m_map.get(); }

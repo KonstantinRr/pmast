@@ -28,7 +28,7 @@
 #ifndef CORE_HPP
 #define CORE_HPP
 
-#include "engine.hpp"
+#include <pmast/internal.hpp>
 
 #include <string>
 #include <glm/glm.hpp>

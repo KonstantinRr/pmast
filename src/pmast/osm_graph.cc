@@ -23,13 +23,14 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-
-#include <pmast/engine.hpp>
-#include <pmast/osm_mesh.hpp>
 #include <pmast/osm_graph.hpp>
+#include <pmast/osm_mesh.hpp>
+#include <pmast/agent.hpp>
 
 #include <engine/util.hpp>
 
+#include <algorithm>
+#include <limits>
 #include <chrono>
 #include <limits>
 #include <queue>
@@ -37,6 +38,8 @@
 using namespace traffic;
 using namespace glm;
 using namespace std;
+
+size_t traffic::nullIndex = numeric_limits<size_t>::max();
 
 // ---- BufferedNode ---- //
 
@@ -77,25 +80,29 @@ using BufferedFastNode = BufferedNode<TrafficGraphNode>;
 
 // ---- TrafficGraphEdge ---- //
 
-TrafficGraphEdge::TrafficGraphEdge(size_t goal, prec_t weight)
-	: goal(goal), weight(weight)
+TrafficGraphEdge::TrafficGraphEdge(size_t goal, prec_t weight, prec_t distance)
+	: goal(goal), weight(weight), distance(distance)
 {
 
 }
 
 // ---- TrafficGraphNode ---- //
 
-TrafficGraphNode::TrafficGraphNode(int64_t nodeID, prec_t x, prec_t y)
-	: nodeID(nodeID), x(x), y(y)
+TrafficGraphNode::TrafficGraphNode(GraphNode* linked, prec_t x, prec_t y)
+	: linked(linked), x(x), y(y)
 {
 
 }
 
+void TrafficGraphNode::linkBack() noexcept
+{
+	linked->m_linked = this;
+}
+
 // ---- GraphEdge ---- //
 
-GraphEdge::GraphEdge(int64_t pGoalID, prec_t pWeight) :
-	goal(pGoalID),
-	weight(pWeight)
+GraphEdge::GraphEdge(int64_t goalID, prec_t weight, prec_t distance) :
+	goal(goalID), weight(weight), distance(distance)
 {
 
 }
@@ -141,8 +148,8 @@ Graph::Graph(const shared_ptr<OSMSegment>& xmlmap)
 					prec_t distance = (prec_t)simpleDistance(
 						xmlmap->getNode(lastID).asVector(),
 						xmlmap->getNode(currentID).asVector());
-					graphBuffer[currentIndex].connections.push_back(GraphEdge(lastID, distance));
-					graphBuffer[lastIndex].connections.push_back(GraphEdge(currentID, distance));
+					graphBuffer[currentIndex].connections.push_back(GraphEdge(lastID, distance, distance));
+					graphBuffer[lastIndex].connections.push_back(GraphEdge(currentID, distance, distance));
 				}
 			}
 			else
@@ -156,8 +163,8 @@ Graph::Graph(const shared_ptr<OSMSegment>& xmlmap)
 					prec_t distance = (prec_t)simpleDistance(
 						xmlmap->getNode(lastID).asVector(),
 						xmlmap->getNode(currentID).asVector());
-					graphBuffer[currentIndex].connections.push_back(GraphEdge(lastID, distance));
-					graphBuffer[lastIndex].connections.push_back(GraphEdge(currentID, distance));
+					graphBuffer[currentIndex].connections.push_back(GraphEdge(lastID, distance, distance));
+					graphBuffer[lastIndex].connections.push_back(GraphEdge(currentID, distance, distance));
 				}
 			}
 			lastID = currentID;
@@ -303,14 +310,35 @@ size_t traffic::Graph::getManagedSize() const
 }
 
 
-TrafficGraph::TrafficGraph(const Graph& graph)
+TrafficGraphNode& TrafficGraph::findNodeByIndex(TrafficGraphNodeIndex nodeIdx) noexcept {
+	return graphBuffer[nodeIdx];
+}
+TrafficGraphEdge& TrafficGraph::findEdgeByIndex(
+	TrafficGraphNodeIndex nodeIdx, TrafficGraphEdgeIndex edgeIdx) noexcept {
+	return graphBuffer[nodeIdx].connections[edgeIdx];
+}
+
+size_t TrafficGraph::nodeCount() const noexcept { return graphBuffer.size(); }
+std::vector<TrafficGraphNode>& TrafficGraph::nodes() noexcept { return graphBuffer; }
+const std::vector< TrafficGraphNode>& TrafficGraph::nodes() const noexcept { return graphBuffer; }
+
+// ---- Route ---- //
+Route::Route(std::vector<int64_t> const& nodes) : RouteGeneric(nodes) { }
+Route::Route(std::vector<int64_t>&& nodes) : RouteGeneric(std::move(nodes)) { }
+
+// ---- IndexRoute ---- //
+IndexRoute::IndexRoute(std::vector<TrafficGraphNodeIndex> const& nodes) : RouteGeneric(nodes) { }
+IndexRoute::IndexRoute(std::vector<TrafficGraphNodeIndex>&& nodes) : RouteGeneric(std::move(nodes)) { }
+
+
+TrafficGraph::TrafficGraph(Graph& graph)
 {
-	const std::vector<GraphNode> &buf = graph.getBuffer();
+	std::vector<GraphNode> &buf = graph.getBuffer();
 	// reserves the needed capacity
 	graphBuffer.resize(buf.size());
 	
 	for (size_t i = 0; i < buf.size(); i++) {
-		TrafficGraphNode node(buf[i].nodeID, buf[i].lat, buf[i].lon);
+		TrafficGraphNode node(&(buf[i]), buf[i].lat, buf[i].lon);
 		for (size_t k = 0; k < buf[i].connections.size(); k++) {
 			node.connections.resize(buf[i].connections.size());
 
@@ -322,7 +350,8 @@ TrafficGraph::TrafficGraph(const Graph& graph)
 
 			node.connections[k] = TrafficGraphEdge(
 				static_cast<size_t>(goalIndex),
-				buf[i].connections[k].weight
+				buf[i].connections[k].weight,
+				buf[i].connections[k].distance
 			);
 		}
 		graphBuffer[i] = std::move(node);
@@ -331,11 +360,17 @@ TrafficGraph::TrafficGraph(const Graph& graph)
 
 Route TrafficGraph::findRoute(size_t start, size_t goal)
 {
+	IndexRoute idxRoute = findIndexRoute(start, goal);
+	return toIDRoute(idxRoute);
+}
+
+IndexRoute TrafficGraph::findIndexRoute(size_t start, size_t goal)
+{
 	prec_t maxDistanceScale = 3.0f;
 	auto begin = std::chrono::steady_clock::now();
 
 	if (start == goal)
-		return Route();
+		return IndexRoute();
 
 	// Initializes the buffered data using an empty list
 	size_t nodeCount = graphBuffer.size();
@@ -365,27 +400,33 @@ Route TrafficGraph::findRoute(size_t start, size_t goal)
 		// All possible connections where searched and the goal was not found.
 		// This means that there is not a possible way to reach the destination node.
 		if (queue.empty())
-			return Route();
+			return IndexRoute();
 
 		// Takes the element with the highest priority from the queue
 		BufferedFastNode* currentNode = queue.top();
 		if (currentNode->distance > maxDistance)
-			return Route();
+			return IndexRoute();
 		queue.pop();
 
 		// Checks the goal condition. Starts the backpropagation
 		// algorithm if the goal was found to output the shortest route.
-		if (currentNode->node->nodeID == graphBuffer[goal].nodeID) {
+		if (currentNode->node->linked->nodeID == graphBuffer[goal].linked->nodeID) {
 			Route route;
+			IndexRoute idxRoute;
 			do {
-				route.addNode(currentNode->node->nodeID);
+				route.addBack(currentNode->node->linked->nodeID);
+				idxRoute.addBack(currentNode - nodes.data());
 				currentNode = currentNode->previous;
-			} while (currentNode->node->nodeID != graphBuffer[start].nodeID);
+			} while (currentNode->node->linked->nodeID != graphBuffer[start].linked->nodeID);
+
+			// we actually want to find the way from start to end
+			route.reverse();
+			idxRoute.reverse();
 
 			auto end = std::chrono::steady_clock::now();
 			spdlog::info("Found path in {}[us]", std::chrono::duration_cast<
 				std::chrono::microseconds>(end - begin).count());
-			return route;
+			return idxRoute;
 		}
 
 		auto& connections = currentNode->node->connections;
@@ -407,4 +448,12 @@ Route TrafficGraph::findRoute(size_t start, size_t goal)
 		// marks the node finally as being visited
 		currentNode->visited = true;
 	}
+}
+
+Route traffic::TrafficGraph::toIDRoute(const IndexRoute& idxRoute) const noexcept
+{
+	std::vector<int64_t> out(idxRoute.size());
+	std::transform(idxRoute.begin(), idxRoute.end(), out.begin(),
+		[this](TrafficGraphNodeIndex idx) { return this->buffer(idx).linked->nodeID; });
+	return Route(std::move(out));
 }

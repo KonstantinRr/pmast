@@ -23,7 +23,6 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-#include <pmast/engine.hpp>
 #include <pmast/geom.hpp>
 
 #include <math.h>

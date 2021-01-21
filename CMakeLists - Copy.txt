@@ -33,11 +33,37 @@ macro(CHECK_CXX_COMPILER_AND_LINKER_FLAGS_BASE _RESULT _CXX_FLAGS _LINKER_FLAGS)
   set(CMAKE_REQUIRED_LIBRARIES "")
 endmacro()
 
+function(add_external_library)
+    set(options)
+    set(oneValueArgs TARGET WORKING_DIRECTORY OUTPUT COMMENT)
+    set(multiValueArgs COMMAND INCLUDE_DIRS)
+    cmake_parse_arguments(ARGS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    # Specify how to build the result of the library
+    add_custom_command(OUTPUT "${ARGS_OUTPUT}"
+        COMMAND ${ARGS_COMMAND}
+        WORKING_DIRECTORY "${ARGS_WORKING_DIRECTORY}"
+        COMMENT "${ARGS_COMMENT}")
+
+    # Create a target out of the library compilation result
+    add_custom_target(${ARGS_TARGET}_target DEPENDS ${ARGS_OUTPUT})
+
+    # Create an library target out of the library compilation result
+    add_library(${ARGS_TARGET} STATIC IMPORTED GLOBAL)
+    add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_target)
+
+    # Specify where the library is and where to find the headers
+    set_target_properties(${ARGS_TARGET}
+        PROPERTIES
+        IMPORTED_LOCATION "${ARGS_OUTPUT}"
+        INTERFACE_INCLUDE_DIRECTORIES "${ARGS_INCLUDE_DIRS}")
+endfunction()
+
 ######## PMAST SOURCES ########
 set(PMAST_SOURCES # All source files in the PMAST project
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/main.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/agent.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/internal.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/engine.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/geom.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/osm_graph.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/osm_mesh.cc"
@@ -49,7 +75,7 @@ set(PMAST_SOURCES # All source files in the PMAST project
 set(PMAST_HEADERS # All header files in the PMAST project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/pmast.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/agent.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/internal.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/engine.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/geom.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/osm_graph.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/osm_mesh.hpp"
@@ -59,6 +85,7 @@ set(PMAST_HEADERS # All header files in the PMAST project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/render.hpp")
 set(PMAST_INCLUDE  # All includes in the PMAST projects
   "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/cptl"
   "${CMAKE_CURRENT_SOURCE_DIR}/ext/glm"
   "${CMAKE_CURRENT_SOURCE_DIR}/ext/json"
   "${CMAKE_CURRENT_SOURCE_DIR}/ext/rapidxml"
@@ -90,6 +117,16 @@ set(ENGINE_HEADERS # All header files in the ENGINE project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/thread.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/util.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/engine/listener.hpp")
+set(ENGINE_INCLUDE # All include files in the ENGINE project
+  "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/glad"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/upng/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/glm"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Source"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/cptl"
+  "${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/include")
 
 # Prefer libc++ in conjunction with Clang, not on Windows
 if (NOT MSVC)
@@ -114,13 +151,9 @@ if (NOT MSVC)
   endif()
 endif()
 
-# Builds the library
-add_library(engine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
-add_executable(pmast ${PMAST_SOURCES} ${PMAST_HEADERS})
-
 if (MSVC)
   # warning level 4 and all warnings as errors
-  #add_compile_options(/W4 /WX)
+  add_compile_options(/W4 /WX)
 else()
   # Finds OpenGL and X11
   find_package(OpenGL REQUIRED)
@@ -140,9 +173,6 @@ else()
   if (OPTIMIZE_SPEED)
     add_compile_options(-O3)
   endif()
-
-  target_link_libraries(engine PUBLIC m ${X11_LIBRARIES})
-  target_include_directories(eninge PUBLIC ${X11_INCLUDE_DIR})
 endif()
 
 # Copies the assets
@@ -157,17 +187,52 @@ add_subdirectory("ext/fmt")
 add_subdirectory("ext/glfw")
 add_subdirectory("ext/spdlog")
 
+# Builds the library
+add_library(engine ${ENGINE_SOURCES} ${ENGINE_HEADERS})
+add_executable(pmast ${PMAST_SOURCES} ${PMAST_HEADERS})
 
-target_link_libraries(engine PUBLIC spdlog PRIVATE glfw PRIVATE fmt::fmt PRIVATE ${CMAKE_DL_LIBS})
-target_include_directories(engine
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext/glad"
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/upng/include"
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext/glm"
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/include"
-  PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/include"
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/include")
+######## BUILDING FREEIMAGE ########
+if (UNIX)
+  add_external_library(TARGET freeimage
+    COMMAND           make -j -C "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    OUTPUT            "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Dist/libfreeimage.a"
+    INCLUDE_DIRS      "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Source/"
+    COMMENT           "Building FreeImage for Linux"
+  )
+endif (UNIX)
+if (MSVC)
+  if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+    message("Compiling FreeImage for Windows x32")
+    set(freeimage_libpath "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Dist/x32/FreeImage.lib")
+    set(freeimage_dllpath "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Dist/x32/FreeImage.dll")
+    add_external_library(TARGET freeimage
+        COMMAND           msbuild "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/FreeImage.2017.sln" /property:Configuration=Release /property:Platform=Win32
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT            ${freeimage_libpath}
+        INCLUDE_DIRS      "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Source/"
+        COMMENT           "Building FreeImage for Windows x32 (MSVC 2017)"
+    )
+  ELSE()
+    message("Compiling FreeImage for Windows x64")
+    set(freeimage_libpath "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Dist/x64/FreeImage.lib")
+    set(freeimage_dllpath "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Dist/x64/FreeImage.dll")
+    add_external_library(TARGET freeimage
+        COMMAND           msbuild "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/FreeImage.2017.sln" /property:Configuration=Release /property:Platform=x64
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT            ${freeimage_libpath}
+        INCLUDE_DIRS      "${CMAKE_CURRENT_SOURCE_DIR}/ext/FreeImage/Source/"
+        COMMENT           "Building FreeImage for Windows x64 (MSVC 2017)"
+    )
+  ENDIF()
+  add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${freeimage_dllpath} "${CMAKE_BINARY_DIR}/FreeImage.dll"
+  )
+endif(MSVC)
 
-target_link_libraries(pmast PRIVATE engine)
-target_include_directories(pmast PRIVATE ${PMAST_INCLUDE})
+target_link_libraries(engine PUBLIC freeimage m ${X11_LIBRARIES} ${CMAKE_DL_LIBS})
+target_include_directories(engine PUBLIC ${ENGINE_INCLUDE} ${X11_INCLUDE_DIR})
+
+target_link_libraries(pmast PUBLIC engine glfw fmt::fmt)
+target_include_directories(pmast PUBLIC ${PMAST_INCLUDE})
 add_dependencies(pmast copy-files)

@@ -24,12 +24,14 @@
 /// July 2020
 
 #include <pmast/mapcanvas.hpp>
-#include <pmast/engine.hpp>
+#include <pmast/agent.hpp>
 #include <pmast/osm_mesh.hpp>
 #include <pmast/osm_graph.hpp>
 
 #include <glm/gtx/matrix_transform_2d.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+
+#include <iostream>
 
 using namespace traffic;
 using namespace glm;
@@ -49,14 +51,25 @@ MapCanvas::MapCanvas(std::shared_ptr<OSMSegment> world)
 	// custom shader
 	using namespace nyrem;
 	try {
+		MeshBuilder2D rect = loadRect2D();
+		m_model = std::make_shared<GLModel>(rect.exporter()
+			.addVertex().addTexture()
+			.exportData());
+
+
 		l_shader = std::make_shared<LineMemoryShader>();
 		l_shader->create();
+		rect_shader = std::make_shared<MemoryRectShader>();
+		rect_shader->create();
 
-		l_comp = std::make_shared<RenderComponent<
-			LineStageBuffer, LineMemoryShader>>();
+		rect_comp = std::make_shared<RenderComponent<RectStageBuffer, RectShader>>();
+		rect_comp->setShader(rect_shader);
+
+		l_comp = std::make_shared<RenderComponent<LineStageBuffer, LineMemoryShader>>();
 		l_comp->setShader(l_shader);
 
 		l_pipeline.addStage(l_comp);
+		l_pipeline.addStage(rect_comp);
 	}
 	catch (const std::exception &excp) {
 		l_shader = nullptr;
@@ -65,6 +78,7 @@ MapCanvas::MapCanvas(std::shared_ptr<OSMSegment> world)
 		throw;
 	}
 }
+
 
 // ---- Apply Changes ---- //
 
@@ -320,8 +334,7 @@ void MapCanvas::render(const nyrem::RenderContext &context)
 	if (hasMap()) {
 		auto transform = transformPlaneToView4DGLM();
 
-		nyrem::RenderList<nyrem::Entity2D>
-			&renderList = l_comp->stageBuffer().renderList;
+		nyrem::RenderList<nyrem::Entity2D>&renderList = l_comp->stageBuffer().renderList;
 
 		renderList.clear();
 
@@ -335,6 +348,19 @@ void MapCanvas::render(const nyrem::RenderContext &context)
 			t->setTransformationMatrix(transform);
 			renderList.add(t);
 		}
+
+		if (m_agentList != nullptr) {
+			rect_comp->stageBuffer().renderList.clear();
+			for (const Agent &agent : *m_agentList) {
+				rect_comp->stageBuffer().renderList.add(
+					std::make_shared<nyrem::TransformableEntity2D>(nyrem::TransformableEntity2D(1,
+						nullptr, nullptr, { nyrem::vec3{0.0f, 1.0f, 0.0f} },
+						agent.physical().position(), { 0.01f, 0.01f }, 0.0f
+					))
+				);
+			}
+		}
+
 		l_pipeline.render(context);
 	}
 }
@@ -355,4 +381,9 @@ std::string MapCanvas::info() {
 		cursor.x, cursor.y,
 		m_rotation, m_zoom,
 		rect().summary());
+}
+
+void traffic::MapCanvas::setAgentList(const std::vector<Agent>& agentList)
+{
+	m_agentList = &agentList;
 }

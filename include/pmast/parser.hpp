@@ -28,16 +28,14 @@
 #ifndef PARSER_HPP
 #define PARSER_HPP
 
-#include "engine.hpp"
+#include <pmast/internal.hpp>
+#include <pmast/agent.hpp>
+#include <pmast/osm.hpp>
 
 #include <engine/thread.hpp>
 
-#include <ctpl.h>
 #include <string>
 #include <chrono>
-
-#include "agent.hpp"
-#include "osm.hpp"
 
 using taglist_t = std::vector<std::pair<std::string, std::string>>;
 

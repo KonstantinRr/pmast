@@ -28,7 +28,8 @@
 #ifndef OSM_H
 #define OSM_H
 
-#include "engine.hpp"
+#include <pmast/internal.hpp>
+#include <pmast/geom.hpp>
 
 #include <vector>
 #include <memory>
@@ -36,7 +37,6 @@
 #include <unordered_map>
 #include <glm/glm.hpp>
 
-#include "geom.hpp"
 #include "robin_hood.h"
 #include "json.hpp"
 

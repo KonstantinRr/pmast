@@ -23,56 +23,57 @@
 /// Written by Konstantin Rolf (konstantin.rolf@gmail.com)
 /// July 2020
 
-
 #pragma once
 
 #ifndef NYREM_THREAD_HPP
 #define NYREM_THREAD_HPP
 
-#include "internal.hpp"
+#include <engine/internal.hpp>
 
 #include <memory>
 #include <future>
 #include <functional>
 
-namespace nyrem {
-    class ConcurrencyManager {
-    public:
-        ///<summary>Creates a new Concurrency manager with the default thread size</summary>
-        ConcurrencyManager();
-        ConcurrencyManager(size_t n);
+NYREM_NAMESPACE_BEGIN
+
+class ConcurrencyManager {
+public:
+    ///<summary>Creates a new Concurrency manager with the default thread size</summary>
+    ConcurrencyManager();
+    ConcurrencyManager(size_t n);
         
-        void resize(size_t n);
+    void resize(size_t n);
 
-        ConcurrencyManager(const ConcurrencyManager&) = delete;
-        ConcurrencyManager(ConcurrencyManager &&) = default;
+    ConcurrencyManager(const ConcurrencyManager&) = delete;
+    ConcurrencyManager(ConcurrencyManager &&) = default;
 
-        ConcurrencyManager& operator=(const ConcurrencyManager&) = delete;
-        ConcurrencyManager& operator=(ConcurrencyManager &&) = default;
+    ConcurrencyManager& operator=(const ConcurrencyManager&) = delete;
+    ConcurrencyManager& operator=(ConcurrencyManager &&) = default;
 
-        ~ConcurrencyManager();
+    ~ConcurrencyManager();
 
-        template<typename T, typename ...Args>
-        std::promise<T> add(const std::function<T(Args...)> &exec, Args&& ... args) {
-            std::promise<T> prom;
-            addRaw([...args = std::forward<Args>(args), &exec, &prom](int) {
-                try {
-                    prom.set_value(exec(std::forward<Args>(args)...));
-                } catch (const std::exception &excp) {
-                    prom.set_exception(excp);
-                } catch (...) {
-                    prom.set_exception(std::runtime_error("An unknwon error occurred"));
-                }
-            });
-            return prom;
-        }
+    template<typename T, typename ...Args>
+    std::promise<T> add(const std::function<T(Args...)> &exec, Args&& ... args) {
+        std::promise<T> prom;
+        addRaw([...args = std::forward<Args>(args), &exec, &prom](int) {
+            try {
+                prom.set_value(exec(std::forward<Args>(args)...));
+            } catch (const std::exception &excp) {
+                prom.set_exception(excp);
+            } catch (...) {
+                prom.set_exception(std::runtime_error("An unknwon error occurred"));
+            }
+        });
+        return prom;
+    }
 
-        void addRaw(const std::function<void(int)> &exec);
+    void addRaw(const std::function<void(int)> &exec);
         
-    protected:
-        struct ThreadManagerImpl;
-        std::unique_ptr<ThreadManagerImpl> m_pool;
-    };
-}
+protected:
+    struct ThreadManagerImpl;
+    std::unique_ptr<ThreadManagerImpl> m_pool;
+};
+
+NYREM_NAMESPACE_END
 
 #endif

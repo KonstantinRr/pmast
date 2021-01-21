@@ -31,7 +31,7 @@
 
 #include <limits>
 
-using namespace nyrem;
+NYREM_USE_NAMESPACE
 
 RenderContext::RenderContext(size_t w, size_t h, float s)
     : w(w), h(h), s(s) { }
@@ -87,7 +87,7 @@ void showInfoLog(GLuint program) {
     spdlog::info("Could not link Program");
     GLint logSize = 0;
     CGL(glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logSize));
-    std::vector<GLchar> errorLog(static_cast<size_t>(logSize + 1));
+    std::vector<GLchar> errorLog(static_cast<size_t>(logSize) + 1);
     errorLog[static_cast<size_t>(logSize)] = '\0';
     CGL(glGetProgramInfoLog(program, logSize, &logSize, &errorLog[0]));
     spdlog::error("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{}", errorLog.data());
@@ -183,7 +183,7 @@ void ShaderBase::create() {
         spdlog::info("Shaders successfully linked");
         initializeUniforms();
         spdlog::info("Uniforms successfully loaded");
-    } catch (const std::exception &excp) {
+    } catch (const std::runtime_error&excp) {
         spdlog::error("Could not create shader {}", excp.what());
         throw;
     }
@@ -228,8 +228,10 @@ void ShaderBase::loadMat4x4(GLint location, const glm::mat4x4 &mat) { CGL(glUnif
 
 GLint ShaderBase::uniformLocation(const std::string &name, bool required) {
     GLint v = glGetUniformLocation(program, name.c_str());
-    if (required && v == -1)
+    if (required && v == -1) {
+        __debugbreak();
         throw std::runtime_error("Could not load uniform " + name);
+    }
     return v;
 }
 
@@ -313,16 +315,20 @@ void TickerList::updateAll(float dt) {
 }
 
 RectStageBuffer::RectStageBuffer(
-    const std::shared_ptr<RenderList<TransformableEntity2D>>& renderList)
+    const RenderList<TransformableEntity2D>& renderList)
     : renderList(renderList) { }
 
 // ---- RectShader ---- //
 RectShader::RectShader()
-    : ShaderBase(true, true) { }
+    : ShaderBase(true, true),
+    uniformTexture(-1), uniformTransform(-1),
+    uniformColor(-1), uniformUseColor(-1) { }
 
 RectShader::RectShader(RectShader &&sh) : ShaderBase(std::move(sh)),
     uniformTexture(std::exchange(sh.uniformTexture, -1)),
-    uniformTransform(std::exchange(sh.uniformTransform, -1)) { }
+    uniformTransform(std::exchange(sh.uniformTransform, -1)),
+    uniformColor(std::exchange(sh.uniformColor, -1)),
+    uniformUseColor(std::exchange(sh.uniformUseColor, -1)) { }
 
 
 RectShader& RectShader::operator=(RectShader &&sh)
@@ -330,6 +336,8 @@ RectShader& RectShader::operator=(RectShader &&sh)
     ShaderBase::operator=(std::move(sh));
     uniformTexture = std::exchange(sh.uniformTexture, -1);
     uniformTransform =std::exchange(sh.uniformTransform, -1);
+    uniformColor = std::exchange(sh.uniformColor, -1);
+    uniformUseColor = std::exchange(sh.uniformUseColor, -1);
     return *this;
 }
 
@@ -342,8 +350,16 @@ void RectShader::render(const RenderList<TransformableEntity2D>& renderList) {
 
     for (auto& entity : renderList) {
         loadTransform(entity->calculateTransformationMatrix());
+        if (entity->getColorStorage().hasColor()) {
+            loadUseColor(true);
+            loadColor(entity->getColorStorage()[0]);
+        }
+        else {
+            loadUseColor(false);
+            entity->getTexture()->bind(); // binds texture
+        }
+
         entity->getModel()->bind(); // binds the model
-        entity->getTexture()->bind(); // binds texture
         glDrawArrays(GL_TRIANGLES, 0, entity->getModel()->getSize());
     }
 
@@ -351,15 +367,19 @@ void RectShader::render(const RenderList<TransformableEntity2D>& renderList) {
 }
 
 void RectShader::render(const RectStageBuffer& renderList) {
-    render(*renderList.renderList);
+    render(renderList.renderList);
 }
 
+void RectShader::loadColor(nyrem::vec3 color) { loadVec3(uniformColor, color); }
+void RectShader::loadUseColor(bool value) { loadBool(uniformUseColor, value); }
 void RectShader::loadTransform(const glm::mat3x3& matrix) { loadMat3x3(uniformTransform, matrix); }
 void RectShader::loadTexture(GLint texture) { loadInt(uniformTexture, texture); }
 
 void RectShader::initializeUniforms() {
+    uniformColor = uniformLocation("u_color");
+    uniformUseColor = uniformLocation("u_useColor");
     uniformTexture = uniformLocation("textureSampler");
-    uniformTransform = uniformLocation("transform");
+    uniformTransform = uniformLocation("mvp");
 }
 
 // ---- SimpleShader ---- //
@@ -677,40 +697,59 @@ std::vector<char> PhongMemoryShader::retrieveFragmentShader()
     return toArray(frag);
 }
 
+/*
+#version 330
+
+uniform mat4 mvp;
+
+layout(location = 0) in vec2 vVertex;
+layout(location = 1) in vec3 color;
+out vec3 mixedColor;
+
+void main(void) {
+    gl_Position = mvp * vec4(vVertex, 0.0, 1.0);
+    mixedColor = color;
+})";
+*/
+
 std::vector<char> MemoryRectShader::retrieveFragmentShader()
 {
     const char * frag = R"(
-    #version 330 core
+    #version 330
 
     in vec2 texturePosition;
-    out vec3 color;
+    out vec4 color;
+    
     uniform sampler2D textureSampler;
+    uniform vec3 u_color;
+    uniform int u_useColor;
 
     void main(){
-        color = texture(textureSampler, texturePosition).xyz;
-    }
-    )";
+        if (u_useColor != 0) {
+            color = texture(textureSampler, texturePosition);
+        } else {
+            color = vec4(u_color, 1.0);
+        }
+    })";
     return toArray(frag);
 }
 
 std::vector<char> MemoryRectShader::retrieveVertexShader()
 {
     const char * vert = R"(
-    #version 330 core
+    #version 330
+
+    uniform mat4 mvp;
 
     layout(location = 0) in vec2 vertexPosition;
     layout(location = 1) in vec2 vertexTexturePosition;
 
     out vec2 texturePosition;
-
-    // Values that stay constant for the whole mesh.
-    uniform mat3 transform;
   
-    void main(){
-      gl_Position = vec4(transform * vec3(vertexPosition, -1.0), 1.0);
-      texturePosition = vertexTexturePosition;
-    }
-    )";
+    void main() {
+        gl_Position = mvp * vec4(vertexPosition, 0.0, 1.0);
+        texturePosition = vertexTexturePosition;
+    })";
     return toArray(vert);
 }
 
@@ -884,5 +923,12 @@ std::vector<char> LineMemoryShader::retrieveFragmentShader()
 // Explicit instantiations
 template class nyrem::RenderList<Entity>;
 template class nyrem::RenderBatch<Entity>;
+
 template class nyrem::RenderList<Entity2D>;
+template class nyrem::RenderList<MatrixBufferedEntity2D>;
+template class nyrem::RenderList<TransformableEntity2D>;
+template class nyrem::RenderList<TransformedEntity2D>;
 template class nyrem::RenderBatch<Entity2D>;
+template class nyrem::RenderBatch<MatrixBufferedEntity2D>;
+template class nyrem::RenderBatch<TransformableEntity2D>;
+template class nyrem::RenderBatch<TransformedEntity2D>;

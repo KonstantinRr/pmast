@@ -28,12 +28,10 @@
 #ifndef TRAFFIC_RENDER_HPP
 #define TRAFFIC_RENDER_HPP
 
-#include "engine.hpp"
-
+#include <pmast/internal.hpp>
+#include <pmast/osm.hpp>
+#include <pmast/osm_graph.hpp>
 #include <engine/graphics.hpp>
-
-#include "osm.hpp"
-#include "osm_graph.hpp"
 
 namespace traffic
 {
