@@ -210,6 +210,8 @@ namespace traffic
         const std::shared_ptr<OSMSegment>& getMap() const;
         const std::shared_ptr<OSMSegment>& getHighwayMap() const;
         const std::shared_ptr<Graph>& getGraph() const;
+        const std::shared_ptr<TrafficGraph>& getTrafficGraph() const;
+        
         const std::vector<Agent>& getAgents() const;
 
     protected:

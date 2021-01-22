@@ -142,7 +142,7 @@ else()
   endif()
 
   target_link_libraries(engine PUBLIC m ${X11_LIBRARIES})
-  target_include_directories(eninge PUBLIC ${X11_INCLUDE_DIR})
+  target_include_directories(engine PUBLIC ${X11_INCLUDE_DIR})
 endif()
 
 # Copies the assets

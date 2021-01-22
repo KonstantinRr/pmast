@@ -117,7 +117,7 @@ void Agent::update(double dt)
 {
     if (m_node == m_end) {
         // we reached our destination, give back controll to the WorldHandler
-        __debugbreak();
+        NYREM_DEBUG_BREAK;
         return; 
     }
 
@@ -128,7 +128,7 @@ void Agent::update(double dt)
         if (!m_route.exists()) {
             // there is no possible way to reach the goal
             // => give back control to the WorldHandler
-            __debugbreak();
+            NYREM_DEBUG_BREAK;
             return;
         }
     }
@@ -145,6 +145,7 @@ void Agent::update(double dt)
             // subtracts the distance to the next node
             nextPosition -= edge->distance - m_edgePosition;
 
+
             // we reached a new new node and need to navigate
             node = &m_graph->findNodeByIndex(edge->goal);
             bool navigated = false;
@@ -156,7 +157,7 @@ void Agent::update(double dt)
                 }
             }
             if (!navigated) {
-                __debugbreak();
+                NYREM_DEBUG_BREAK;
             }
         }
         m_edgePosition = nextPosition;
@@ -250,7 +251,8 @@ void traffic::World::loadMap(const std::shared_ptr<OSMSegment>& map)
 
     m_graph = make_shared<Graph>(k_highway_map);
     m_graph->checkConsistency(*k_highway_map);
-    m_graph->optimize();
+    // creates the optimized Traffic Graph
+    m_traffic_graph = make_shared<TrafficGraph>(*m_graph);
 }
 
 void traffic::World::loadMap(const std::string& file)
@@ -277,4 +279,5 @@ bool traffic::World::hasMap() const noexcept { return m_map.get(); }
 const std::shared_ptr<OSMSegment>& traffic::World::getMap() const { return m_map; }
 const std::shared_ptr<OSMSegment>& traffic::World::getHighwayMap() const { return k_highway_map; }
 const std::shared_ptr<Graph>& World::getGraph() const { return m_graph; }
+const std::shared_ptr<TrafficGraph>& World::getTrafficGraph() const { return m_traffic_graph; }
 const std::vector<Agent>& World::getAgents() const { return m_agents; }

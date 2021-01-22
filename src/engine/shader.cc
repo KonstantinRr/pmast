@@ -229,7 +229,7 @@ void ShaderBase::loadMat4x4(GLint location, const glm::mat4x4 &mat) { CGL(glUnif
 GLint ShaderBase::uniformLocation(const std::string &name, bool required) {
     GLint v = glGetUniformLocation(program, name.c_str());
     if (required && v == -1) {
-        __debugbreak();
+        NYREM_DEBUG_BREAK;
         throw std::runtime_error("Could not load uniform " + name);
     }
     return v;

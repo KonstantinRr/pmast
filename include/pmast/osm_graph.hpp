@@ -92,7 +92,7 @@ namespace traffic
 
 		void reverse() { std::reverse(nodes.begin(), nodes.end()); }
 
-		const int64_t& operator[](size_t idx) const { return nodes[idx]; }
+		const Type& operator[](size_t idx) const { return nodes[idx]; }
 	};
 
 	class Route : public RouteGeneric<int64_t> {
@@ -188,6 +188,12 @@ namespace traffic
 		/// </summary>
 		prec_t x, y;
 
+		// Link back functions //
+		prec_t lat() const noexcept;
+		prec_t lon() const noexcept;
+		int64_t nodeID() const noexcept;
+
+
 	public:
 		TrafficGraphNode() = default;
 		TrafficGraphNode(GraphNode *linked, prec_t x, prec_t y);
@@ -199,8 +205,14 @@ namespace traffic
 	public:
 		explicit TrafficGraph(Graph& graph);
 
-		Route findRoute(size_t start, size_t goal);
-		IndexRoute findIndexRoute(size_t start, size_t goal);
+		/// <summary>Applies the AStar (A*) path finding algorithm on the graph</summary>
+		/// <param name="start">The starting node ID</param>
+		/// <param name="goal">The destination node ID</param>
+		/// <returns>The shortest route between start and goal</returns>
+		Route findRoute(TrafficGraphNodeIndex start, TrafficGraphNodeIndex goal);
+		IndexRoute findIndexRoute(TrafficGraphNodeIndex start, TrafficGraphNodeIndex goal);
+		
+		
 		Route toIDRoute(const IndexRoute &idxRoute) const noexcept;
 
 		TrafficGraphNode& findNodeByIndex(TrafficGraphNodeIndex nodeIdx) noexcept;
@@ -210,7 +222,9 @@ namespace traffic
 		std::vector<TrafficGraphNode>& nodes() noexcept;
 		const std::vector< TrafficGraphNode>& nodes() const noexcept;
 
-
+		TrafficGraphNodeIndex findClosestNodeIdx(const Point &p) const noexcept;
+		const TrafficGraphNode& findClosestNode(const Point &p) const;
+		TrafficGraphNode& findClosestNode(const Point &p);
 
 		inline TrafficGraphNode& buffer(size_t size) noexcept {return graphBuffer[size]; }
 		inline const TrafficGraphNode& buffer(size_t size) const noexcept { return graphBuffer[size]; }
@@ -301,14 +315,6 @@ namespace traffic
 		/// <returns></returns>
 		Graph(const std::shared_ptr<OSMSegment> &xmlmap);
 
-		void optimize();
-
-		/// <summary>Applies the AStar (A*) path finding algorithm on the graph</summary>
-		/// <param name="start">The starting node ID</param>
-		/// <param name="goal">The destination node ID</param>
-		/// <returns>The shortest route between start and goal</returns>
-		Route findRoute(int64_t start, int64_t goal);
-
 		/// <summary>Finds a node by its index in the sequential node array</summary>
 		/// <param name="index">The node's index</param>
 		/// <returns>The node at the given index</returns>
@@ -350,8 +356,6 @@ namespace traffic
 	protected:
 		std::vector<GraphNode> graphBuffer;
 		graphmap_t graphMap;
-
-		std::unique_ptr<TrafficGraph> fastGraph;
 	};
 }
 

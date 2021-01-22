@@ -233,11 +233,12 @@ int main(int argc, char** argv)
 	});
 	input.callbackKey(NYREM_KEY_ENTER).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED && hasStart && hasEnd) {
-			auto& graph = world->getGraph();
-			GraphNode& idStart = graph->findClosestNode(Point(start.x, start.y));
-			GraphNode& idStop = graph->findClosestNode(Point(end.x, end.y));
-			std::cout << "Searching route from " << idStart.nodeID << " " << idStop.nodeID << "\n";
-			Route r = graph->findRoute(idStart.nodeID, idStop.nodeID);
+			auto &traffic = world->getTrafficGraph();
+			TrafficGraphNodeIndex idStart = traffic->findClosestNodeIdx(Point(start.x, start.y));
+			TrafficGraphNodeIndex idStop = traffic->findClosestNodeIdx(Point(end.x, end.y));
+			std::cout << "Searching route from " << idStart << " " << idStop << "\n";
+
+			Route r = traffic->findRoute(idStart, idStop);
 			for (int64_t id : r.nodes) {
 				std::cout << "Node: " << id << "\n";
 			}
@@ -246,9 +247,9 @@ int main(int argc, char** argv)
 	});
 	input.callbackKey(NYREM_KEY_H).listen([&](KeyEvent e) {
 		if (e.action == KEYSTATUS_PRESSED && hasStart && hasEnd) {
-			auto& graph = world->getGraph();
-			GraphNode& idStart = graph->findClosestNode(Point(start.x, start.y));
-			GraphNode& idStop = graph->findClosestNode(Point(end.x, end.y));
+			auto &traffic = world->getTrafficGraph();
+			TrafficGraphNodeIndex idStart = traffic->findClosestNodeIdx(Point(start.x, start.y));
+			TrafficGraphNodeIndex idStop = traffic->findClosestNodeIdx(Point(end.x, end.y));
 		}
 	});
 

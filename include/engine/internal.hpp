@@ -39,7 +39,9 @@
     #include <stdlib.h>
     #include <stdio.h>
     #include <string.h>
+    #include <signal.h>
     #define EXPORT
+    #define NYREM_DEBUG_BREAK raise(SIGTRAP)
 // _Win32 is usually defined by compilers targeting 32 or 64 bit Windows systems
 #elif defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)   
     #define LT_PLATFORM_TARGET LT_TARGET_WIN
@@ -63,6 +65,7 @@
     #else
         // Specific something for Windows (32-bit only)
     #endif
+    #define NYREM_DEBUG_BREAK __debugbreak()
 #endif
 
 #include <assert.h>

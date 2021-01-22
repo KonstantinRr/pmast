@@ -99,6 +99,10 @@ void TrafficGraphNode::linkBack() noexcept
 	linked->m_linked = this;
 }
 
+prec_t TrafficGraphNode::lat() const noexcept { return linked->lat; }
+prec_t TrafficGraphNode::lon() const noexcept { return linked->lon; }
+int64_t TrafficGraphNode::nodeID() const noexcept { return linked->nodeID; }
+
 // ---- GraphEdge ---- //
 
 GraphEdge::GraphEdge(int64_t goalID, prec_t weight, prec_t distance) :
@@ -170,23 +174,6 @@ Graph::Graph(const shared_ptr<OSMSegment>& xmlmap)
 			lastID = currentID;
 		}
 	}
-}
-
-void Graph::optimize()
-{
-	fastGraph = std::make_unique<TrafficGraph>(*this);
-}
-
-Route Graph::findRoute(int64_t start, int64_t goal)
-{
-	int64_t startIndex = findNodeIndex(start);
-	int64_t stopIndex = findNodeIndex(goal);
-	if (startIndex == -1 || stopIndex == -1)
-		throw std::runtime_error("Could not find start/goal indices\n");
-
-	if (fastGraph)
-		return fastGraph->findRoute(startIndex, stopIndex);
-	return Route();
 }
 
 GraphNode& Graph::findNodeByIndex(size_t index) { return graphBuffer[index]; }
@@ -304,7 +291,7 @@ bool Graph::checkConsistency(const OSMSegment& seg) const {
 	return true;
 }
 
-size_t traffic::Graph::getManagedSize() const
+size_t Graph::getManagedSize() const
 {
 	return getSizeOfObjects(graphBuffer);
 }
@@ -358,13 +345,15 @@ TrafficGraph::TrafficGraph(Graph& graph)
 	}
 }
 
-Route TrafficGraph::findRoute(size_t start, size_t goal)
+Route TrafficGraph::findRoute(
+	TrafficGraphNodeIndex start, TrafficGraphNodeIndex goal)
 {
 	IndexRoute idxRoute = findIndexRoute(start, goal);
 	return toIDRoute(idxRoute);
 }
 
-IndexRoute TrafficGraph::findIndexRoute(size_t start, size_t goal)
+IndexRoute TrafficGraph::findIndexRoute(
+	TrafficGraphNodeIndex start, TrafficGraphNodeIndex goal)
 {
 	prec_t maxDistanceScale = 3.0f;
 	auto begin = std::chrono::steady_clock::now();
@@ -450,10 +439,36 @@ IndexRoute TrafficGraph::findIndexRoute(size_t start, size_t goal)
 	}
 }
 
-Route traffic::TrafficGraph::toIDRoute(const IndexRoute& idxRoute) const noexcept
+Route TrafficGraph::toIDRoute(const IndexRoute& idxRoute) const noexcept
 {
 	std::vector<int64_t> out(idxRoute.size());
 	std::transform(idxRoute.begin(), idxRoute.end(), out.begin(),
 		[this](TrafficGraphNodeIndex idx) { return this->buffer(idx).linked->nodeID; });
 	return Route(std::move(out));
+}
+
+TrafficGraphNodeIndex TrafficGraph::findClosestNodeIdx(const Point &p) const noexcept
+{
+	size_t bestIndex = numeric_limits<size_t>::max();
+	prec_t bestDistance = numeric_limits<double>::max();
+	for (size_t i = 0; i < graphBuffer.size(); i++) {
+		double newDistance = traffic::distance(
+			graphBuffer[i].linked->getPosition(), p.toVec());
+		if (newDistance < bestDistance) {
+			bestIndex = i;
+			bestDistance = newDistance;
+		}
+	}
+	return static_cast<TrafficGraphNodeIndex>(bestIndex);
+}
+
+const TrafficGraphNode& TrafficGraph::findClosestNode(const Point &p) const {
+	TrafficGraphNodeIndex idx = findClosestNodeIdx(p);
+	if (idx >= graphBuffer.size())
+		throw std::runtime_error("Could not find closest node, set is empty");
+	return graphBuffer[idx];
+}
+
+TrafficGraphNode& TrafficGraph::findClosestNode(const Point &p) {
+	return const_cast<TrafficGraphNode&>(const_cast<const TrafficGraph*>(this)->findClosestNode(p));
 }
