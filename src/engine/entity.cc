@@ -249,7 +249,7 @@ glm::mat3x3 TransformableEntity2D::calculateTransformationMatrix3D() const
 glm::mat4x4 TransformableEntity2D::calculateTransformationMatrix() const
 {
     glm::mat4x4 transform(1.0f);
-    transform = glm::translate(transform, glm::vec3(entityPosition, 1.0f));
+    transform = glm::translate(transform, glm::vec3(entityPosition, 0.0f));
     transform = glm::rotate(transform, entityRotation, { 0.0F, 0.0F, 1.0F });
     transform = glm::scale(transform, glm::vec3(entityScale, 1.0f));
     return transform;

@@ -85,8 +85,8 @@ namespace traffic
         prec_t tireFriction() const noexcept;
         prec_t mass() const noexcept;
         
-        nyrem::vec2 velocity() noexcept;
-        nyrem::vec2 position() noexcept;
+        nyrem::vec2& velocity() noexcept;
+        nyrem::vec2& position() noexcept;
         const nyrem::vec2& velocity() const noexcept;
         const nyrem::vec2& position() const noexcept;
 
@@ -205,13 +205,13 @@ namespace traffic
         void loadMap(const std::shared_ptr<OSMSegment>& map);
         void loadMap(const std::string &file);
         
-        void createAgent(int64_t startID, int64_t endID);
+        void createAgent(TrafficGraphNodeIndex start, TrafficGraphNodeIndex end);
 
         const std::shared_ptr<OSMSegment>& getMap() const;
         const std::shared_ptr<OSMSegment>& getHighwayMap() const;
         const std::shared_ptr<Graph>& getGraph() const;
         const std::shared_ptr<TrafficGraph>& getTrafficGraph() const;
-        
+
         const std::vector<Agent>& getAgents() const;
 
     protected:

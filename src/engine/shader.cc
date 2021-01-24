@@ -372,7 +372,7 @@ void RectShader::render(const RectStageBuffer& renderList) {
 
 void RectShader::loadColor(nyrem::vec3 color) { loadVec3(uniformColor, color); }
 void RectShader::loadUseColor(bool value) { loadBool(uniformUseColor, value); }
-void RectShader::loadTransform(const glm::mat3x3& matrix) { loadMat3x3(uniformTransform, matrix); }
+void RectShader::loadTransform(const glm::mat4x4& matrix) { loadMat4x4(uniformTransform, matrix); }
 void RectShader::loadTexture(GLint texture) { loadInt(uniformTexture, texture); }
 
 void RectShader::initializeUniforms() {

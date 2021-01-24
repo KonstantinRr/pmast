@@ -352,9 +352,13 @@ void MapCanvas::render(const nyrem::RenderContext &context)
 		if (m_agentList != nullptr) {
 			rect_comp->stageBuffer().renderList.clear();
 			for (const Agent &agent : *m_agentList) {
+				//auto a = std::make_shared<nyrem::TransformableEntity2D>(nyrem::TransformableEntity2D(1,
+				//	nullptr, nullptr, { nyrem::vec3{0.0f, 1.0f, 0.0f} },
+				//	agent.physical().position(), { 0.01f, 0.01f }, 0.0f
+				//));
 				rect_comp->stageBuffer().renderList.add(
 					std::make_shared<nyrem::TransformableEntity2D>(nyrem::TransformableEntity2D(1,
-						nullptr, nullptr, { nyrem::vec3{0.0f, 1.0f, 0.0f} },
+						m_model, nullptr, { nyrem::vec3{0.0f, 1.0f, 0.0f} },
 						agent.physical().position(), { 0.01f, 0.01f }, 0.0f
 					))
 				);

@@ -31,6 +31,8 @@
 #include <pmast/internal.hpp>
 #include <pmast/osm.hpp>
 
+#include <engine/internal.hpp>
+
 #include <vector>
 #include <memory>
 #include <unordered_map>
@@ -276,6 +278,14 @@ namespace traffic
 	struct GraphNode
 	{
 	public:
+		// ---- Member definitions ---- //
+		prec_t lat, lon;
+		nyrem::dvec2 plane;
+		int64_t nodeID;
+		std::vector<GraphEdge> connections;
+
+		TrafficGraphNode *m_linked;
+	public:
 		/// <summary> Creates a GraphNode from a regular OSM node</summary>
 		/// <param name="node">A regular OSM node</param>
 		/// <returns></returns>
@@ -286,17 +296,11 @@ namespace traffic
 		inline size_t getSize() const { return sizeof(*this) + getManagedSize();}
 
 		inline glm::vec2 getPosition() const { return glm::vec2(lat, lon); }
+		inline glm::dvec2 getPlanePosition() const { return plane; }
 		inline prec_t getLatitude() const { return lat; }
 		inline prec_t getLongitude() const { return lon; }
 
 		inline void link(TrafficGraphNode &node) { m_linked = &node; }
-	public:
-		// ---- Member definitions ---- //
-		prec_t lat, lon;
-		int64_t nodeID;
-		std::vector<GraphEdge> connections;
-
-		TrafficGraphNode *m_linked;
 	};
 
 	/// <summary>

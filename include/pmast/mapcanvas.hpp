@@ -191,6 +191,8 @@ protected:
 	std::shared_ptr<traffic::OSMSegment> m_map;
 	std::shared_ptr<traffic::OSMSegment> m_highway_map;
 
+	nyrem::Camera2D m_camera;
+
 	// stores the plane coordinates
 	glm::dvec2 position;
 	// stores the last cursor plane coordinates

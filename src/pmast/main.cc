@@ -250,6 +250,8 @@ int main(int argc, char** argv)
 			auto &traffic = world->getTrafficGraph();
 			TrafficGraphNodeIndex idStart = traffic->findClosestNodeIdx(Point(start.x, start.y));
 			TrafficGraphNodeIndex idStop = traffic->findClosestNodeIdx(Point(end.x, end.y));
+			std::cout << "Creating agent at " << idStart << " to " << idStop << "\n";
+			world->createAgent(idStart, idStop);
 		}
 	});
 

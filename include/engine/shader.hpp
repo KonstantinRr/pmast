@@ -401,7 +401,7 @@ public:
 	void render(const RenderList<TransformableEntity2D>& renderList);
 	void render(const RectStageBuffer& stageBuffer);
 
-	void loadTransform(const glm::mat3x3& matrix);
+	void loadTransform(const glm::mat4x4& matrix);
 	void loadColor(nyrem::vec3 color);
 	void loadUseColor(bool value);
 	void loadTexture(GLint texture);

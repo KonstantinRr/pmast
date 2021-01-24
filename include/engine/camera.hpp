@@ -367,11 +367,12 @@ class Camera2D : public Camera {
 public:
 	Camera2D(
 		const glm::vec2& position = { 0.0f, 0.0f },
-		float rotation = 0.0f) noexcept;
+		float rotation = 0.0f, float zoom=1.0f) noexcept;
 	virtual ~Camera2D() = default;
 
 	float getX() const noexcept;
 	float getY() const noexcept;
+	float zoom() const noexcept;
 	const glm::vec2& getPosition() const noexcept;
 	float getRotation() const noexcept;
 
@@ -379,11 +380,13 @@ public:
 	void setY(float y) noexcept;
 	void setPosition(float x, float y) noexcept;
 	void setPosition(const glm::vec2& pos) noexcept;
+	void setZoom(float zoom) noexcept;
 
 	void setRotation(float rotation) noexcept;
 
 	void move(const glm::vec2& pos) noexcept;
 	void rotate(float rotation) noexcept;
+	void applyZoom(float zoom) noexcept;
 
 	mat4x4 calculateViewMatrix() const noexcept;
 	mat4x4 calculateProjectionMatrix() const noexcept;
@@ -392,7 +395,7 @@ public:
 	mat4x4 projectionMatrix() const noexcept;
 
 protected:
-	float k_rotation;
+	float k_rotation, k_zoom;
 	glm::vec2 k_position;
 };
 
@@ -401,7 +404,7 @@ class MatrixBufferedCamera2D : public Camera2D {
 public:
 	MatrixBufferedCamera2D(
 		const glm::vec2& position = { 0.0f, 0.0f },
-		float rotation = 0.0f) noexcept ;
+		float rotation = 0.0f, float zoom=1.0f) noexcept;
 	virtual ~MatrixBufferedCamera2D() = default;
 
 	virtual void setX(float x) noexcept;

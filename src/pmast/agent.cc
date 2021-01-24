@@ -94,8 +94,8 @@ prec_t PhysicalEntity::tireFriction() const noexcept { return d_tireFriction; }
 prec_t PhysicalEntity::mass() const noexcept { return d_mass; }
 const nyrem::vec2& PhysicalEntity::velocity() const noexcept { return d_velocity; }
 const nyrem::vec2& PhysicalEntity::position() const noexcept { return d_position; }
-nyrem::vec2 PhysicalEntity::velocity() noexcept { return d_velocity; }
-nyrem::vec2 PhysicalEntity::position() noexcept { return d_position; }
+nyrem::vec2& PhysicalEntity::velocity() noexcept { return d_velocity; }
+nyrem::vec2& PhysicalEntity::position() noexcept { return d_position; }
 
 // ---- Agent ---- //
 Agent::Agent(World& world, TrafficGraph& graph,
@@ -270,9 +270,12 @@ void traffic::World::loadMap(const std::string& file)
     loadMap(newMap);
 }
 
-void traffic::World::createAgent(int64_t startID, int64_t endID)
+void World::createAgent(TrafficGraphNodeIndex start, TrafficGraphNodeIndex end)
 {
-    m_agents.push_back(Agent(*this, *m_traffic_graph, startID, endID));
+    Agent agent(*this, *m_traffic_graph, start, end);
+    auto &trafficNode = m_traffic_graph->buffer(start);
+    agent.physical().position() = trafficNode.linked->getPlanePosition();
+    m_agents.push_back(std::move(agent));
 }
 
 bool traffic::World::hasMap() const noexcept { return m_map.get(); }

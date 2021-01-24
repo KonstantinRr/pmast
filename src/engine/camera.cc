@@ -261,12 +261,15 @@ mat4x4 MatrixBufferedCamera3D::viewMatrix() const noexcept { rebuildView(); retu
 mat4x4 MatrixBufferedCamera3D::projectionMatrix() const noexcept{ rebuildProjection(); return m_projectionMatrix; }
 
 // ---- Camera2D ---- //
-Camera2D::Camera2D(const vec2 &position, float rotation)
+Camera2D::Camera2D(const vec2 &position, float rotation, float zoom)
 noexcept :
-    k_rotation(rotation), k_position(position) { }
+    k_rotation(rotation),
+    k_position(position),
+    k_zoom(zoom) { }
 
 float Camera2D::getX() const noexcept { return k_position.x; }
 float Camera2D::getY() const noexcept { return k_position.y; }
+float Camera2D::zoom() const noexcept { return k_zoom; }
 const vec2& Camera2D::getPosition() const noexcept { return k_position; }
 float Camera2D::getRotation() const noexcept { return k_rotation; }
 
@@ -274,17 +277,19 @@ void Camera2D::setX(float x) noexcept { k_position.x = x; }
 void Camera2D::setY(float y) noexcept { k_position.y = y; }
 void Camera2D::setPosition(float x, float y) noexcept { k_position = vec2(x, y); }
 void Camera2D::setPosition(const vec2 &pos) noexcept { k_position = pos; }
-
+void Camera2D::setZoom(float zoom) noexcept { k_zoom = zoom; }
 void Camera2D::setRotation(float rotation) noexcept { k_rotation = rotation; }
 
 void Camera2D::move(const vec2& pos) noexcept { k_position += pos; }
 void Camera2D::rotate(float rotation) noexcept { k_rotation += rotation; }
+void Camera2D::applyZoom(float zoom) noexcept { k_zoom *= zoom; }
 
 mat4x4 Camera2D::calculateViewMatrix() const noexcept
 {
     mat4x4 mat(1.0f);
-    mat = glm::translate(mat, -vec3(k_position.x, k_position.y, 0.0f));
+    mat = glm::scale(mat, glm::vec3(k_zoom, k_zoom, 1.0f));
     mat = glm::rotate(mat, k_rotation, vec3(0.0f, 0.0f, 1.0f));
+    mat = glm::translate(mat, vec3(-k_position.x, -k_position.y, 0.0f));
     return mat;
 }
 
@@ -298,6 +303,11 @@ mat4x4 Camera2D::viewMatrix() const noexcept { return calculateViewMatrix(); }
 mat4x4 Camera2D::projectionMatrix() const noexcept { return calculateProjectionMatrix(); }
 
 // ---- MatrixBufferedCamera2D ---- //
+MatrixBufferedCamera2D::MatrixBufferedCamera2D(
+	const glm::vec2& position, float rotation, float zoom)
+noexcept : Camera2D(position, rotation, zoom) { }
+    
+
 void MatrixBufferedCamera2D::setX(float x) noexcept { k_position.x = x; }
 void MatrixBufferedCamera2D::setY(float y) noexcept { k_position.y = y; }
 void MatrixBufferedCamera2D::setPosition(float x, float y) noexcept { k_position = {x, y}; }

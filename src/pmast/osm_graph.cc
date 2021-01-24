@@ -116,7 +116,8 @@ GraphEdge::GraphEdge(int64_t goalID, prec_t weight, prec_t distance) :
 GraphNode::GraphNode(const OSMNode &node) :
 	lat(node.getLat()),
 	lon(node.getLon()),
-	nodeID(node.getID())
+	nodeID(node.getID()),
+	plane(planeToSphere({lat, lon}))
 {
 
 }
