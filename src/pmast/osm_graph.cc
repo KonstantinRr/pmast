@@ -117,7 +117,7 @@ GraphNode::GraphNode(const OSMNode &node) :
 	lat(node.getLat()),
 	lon(node.getLon()),
 	nodeID(node.getID()),
-	plane(planeToSphere({lat, lon}))
+	plane(sphereToPlane({lon, lat})) // TODO wtf?
 {
 
 }

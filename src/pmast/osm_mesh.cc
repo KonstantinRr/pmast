@@ -89,10 +89,10 @@ dvec2 traffic::sphereToPlane(dvec2 latLon, dvec2 center) {
 	);
 }
 
-dvec2 traffic::sphereToPlane(dvec2 latLon) {
+dvec2 traffic::sphereToPlane(dvec2 lonLat) {
 	return dvec2(
-		latitudeToPlane(latLon.x, latLon),
-		longitudeToPlane(latLon.y, latLon)
+		latitudeToPlane(lonLat.x, lonLat),
+		longitudeToPlane(lonLat.y, lonLat)
 	);
 }
 

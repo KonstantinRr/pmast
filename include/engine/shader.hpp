@@ -101,7 +101,7 @@ protected:
 public:
 	/// Initializes a new shader unit with the given specs.
 	/// This does not create the shader yet.
-	ShaderBase(
+	explicit ShaderBase(
 		bool hasVertexShader=true,
 		bool hasFragmentShader=true);
 	ShaderBase(const ShaderBase&) = delete; 
@@ -337,6 +337,8 @@ public:
 
 class LineMemoryShader : public LineShader {
 public:
+	explicit LineMemoryShader();
+
 	virtual std::vector<char> retrieveVertexShader();
 	virtual std::vector<char> retrieveFragmentShader();
 };
@@ -368,6 +370,8 @@ public:
 
 class TriangleMemoryShader : public TriangleShader {
 public:
+	explicit TriangleMemoryShader();
+
 	virtual std::vector<char> retrieveVertexShader();
 	virtual std::vector<char> retrieveFragmentShader();
 };
@@ -375,9 +379,12 @@ public:
 // ---- RectShader ---- //
 struct RectStageBuffer {
 	RenderList<TransformableEntity2D> renderList;
+	std::shared_ptr<const Camera> camera;
 
 	explicit RectStageBuffer() = default;
-	explicit RectStageBuffer(const RenderList<TransformableEntity2D>& list);
+	explicit RectStageBuffer(
+		const RenderList<TransformableEntity2D>& list,
+		const std::shared_ptr<const Camera> &camera);
 };
 
 
@@ -398,7 +405,9 @@ public:
 	RectShader& operator=(const RectShader&) = delete;
 	RectShader& operator=(RectShader &&sh);
 
-	void render(const RenderList<TransformableEntity2D>& renderList);
+	void render(
+		const RenderList<TransformableEntity2D>& renderList,
+		const std::shared_ptr<const Camera> &camera);
 	void render(const RectStageBuffer& stageBuffer);
 
 	void loadTransform(const glm::mat4x4& matrix);
@@ -411,6 +420,8 @@ public:
 
 class MemoryRectShader : public RectShader {
 public:
+	explicit MemoryRectShader();
+
 	virtual std::vector<char> retrieveVertexShader() override;
 	virtual std::vector<char> retrieveFragmentShader() override;
 };
@@ -541,6 +552,13 @@ using RectListStage = RenderComponent<RectStageBuffer, RectShader>;
 using TriangleStage = RenderComponent<TriangleStageBuffer, TriangleShader>;
 using LineStage = RenderComponent<LineStageBuffer, LineShader>;
 using MVPStage = RenderComponent<MVPListStageBuffer, SimpleMVPShader>;
+
+template<typename Type, typename ...Args>
+std::shared_ptr<Type> make_shader(Args&&... args) {
+	auto ptr = std::make_shared<Type>(std::forward<Args>(args)...);
+	ptr->create();
+	return ptr;
+}
 
 NYREM_NAMESPACE_END
 

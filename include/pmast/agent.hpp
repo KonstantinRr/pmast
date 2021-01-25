@@ -205,6 +205,8 @@ namespace traffic
         void loadMap(const std::shared_ptr<OSMSegment>& map);
         void loadMap(const std::string &file);
         
+        void update(double dt);
+
         void createAgent(TrafficGraphNodeIndex start, TrafficGraphNodeIndex end);
 
         const std::shared_ptr<OSMSegment>& getMap() const;

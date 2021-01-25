@@ -42,7 +42,30 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <mapbox/earcut.hpp>
+
 NYREM_USE_NAMESPACE
+
+// Defines the accessor for vectors
+namespace mapbox {
+namespace util {
+
+template <>
+struct nth<0, vec2> {
+    inline static auto get(const vec2 &t) {
+        return t.x;
+    };
+};
+template <>
+struct nth<1, vec2> {
+    inline static auto get(const vec2 &t) {
+        return t.y;
+    };
+};
+
+} // namespace util
+} // namespace mapbox
+
 
 std::vector<char> nyrem::readFile(const std::string &file)
 {
@@ -423,6 +446,56 @@ glm::mat3x3 MeshBuilder2D::centerMatrix() const {
 void MeshBuilder2D::addVertex(glm::vec2 vertex) { vertices.push_back(vertex); }
 void MeshBuilder2D::addTextureCoord(glm::vec2 vertex) { texCoords.push_back(vertex); }
 void MeshBuilder2D::addColor(glm::vec3 color) { colors.push_back(color); }
+
+struct PolygonStorage {
+protected:
+	std::vector<const std::vector<vec2>*> m_data;
+public:
+	PolygonStorage(const std::vector<vec2> &begin,
+		const std::vector<std::vector<vec2>> &holes = {}) noexcept {
+		add(begin);
+		addAll(holes);
+	}
+
+	void addAll(const std::vector<std::vector<vec2>> &dataList) {
+		m_data.reserve(m_data.size() + dataList.size());
+		for (const auto &data : dataList)
+			m_data.push_back(&data);
+	}
+
+	void add(const std::vector<vec2> &data) noexcept {
+		m_data.push_back(&data);
+	}
+
+	vec2 findByIdx(size_t idx) {
+		size_t dataIdx = 0;
+		while (idx >= m_data[dataIdx]->size()) {
+			idx -= m_data[dataIdx]->size();
+			dataIdx++;
+		}
+		return (*m_data[dataIdx])[idx];
+	}
+
+	bool empty() const noexcept { return m_data.empty(); }
+	size_t size() const noexcept { return m_data.size(); }
+	const std::vector<vec2>& operator[](size_t idx) const { return *(m_data[idx]); }
+
+};
+
+MeshBuilder2D& MeshBuilder2D::addPolygon(
+	const std::vector<vec2> &polygon, const std::vector<std::vector<vec2>> &holes, bool indexed) {
+	
+	using N = uint32_t;
+
+	PolygonStorage storage(polygon, holes);
+	storage.addAll(holes);
+	std::vector<N> indices = mapbox::earcut<N>(storage);
+
+	vertices.reserve(vertices.size() + indices.size());
+	for (auto idx : indices)
+		vertices.push_back(storage.findByIdx(idx));
+	return *this;
+}
 
 MeshBuilder2D& MeshBuilder2D::addVertices(std::initializer_list<glm::vec2> init) {
 	return addVertices(init.begin(), init.end());

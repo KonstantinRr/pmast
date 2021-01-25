@@ -270,6 +270,10 @@ void traffic::World::loadMap(const std::string& file)
     loadMap(newMap);
 }
 
+void World::update(double dt) {
+
+}
+
 void World::createAgent(TrafficGraphNodeIndex start, TrafficGraphNodeIndex end)
 {
     Agent agent(*this, *m_traffic_graph, start, end);

@@ -24,10 +24,40 @@
 /// July 2020
 
 #include <engine/camera.hpp>
+#include <engine/shader.hpp>
 
 #include <glm/gtc/matrix_transform.hpp>
 
 NYREM_USE_NAMESPACE
+
+//// ---- ViewTransformer ---- ////
+mat4x4 ViewTransformer::matrix() const noexcept {
+    return mat4x4(1.0f);
+}
+
+void ViewTransformer::passthrough(mat4x4 &mat) const noexcept {
+    mat *= matrix();
+}
+
+//// ---- DimensionScaler ---- ////
+DimensionScaler::DimensionScaler() noexcept : m_width(1), m_height(1) { }
+void DimensionScaler::updateMatrix(const RenderContext &context) noexcept {
+    m_width = context.width();
+    m_height = context.height();
+}
+void DimensionScaler::updateMatrix(size_t width, size_t height) noexcept {
+    m_width = width;
+    m_height = height;
+}
+
+//// ---- WidthScaler ---- ////
+mat4x4 WidthScaler::matrix() const noexcept {
+    return mat4x4(1.0f);
+}
+//// ---- HeightScaler ---- ////
+mat4x4 HeightScaler::matrix() const noexcept {
+    return mat4x4(1.0f);
+}
 
 //// ---- Camera ---- ////
 mat4x4 Camera::viewMatrix()
@@ -40,6 +70,33 @@ const noexcept {
     return mat4x4(1.0f);
 }
 
+mat4x4 Camera::matrix() const noexcept {
+    bool hasView = hasViewMatrix();
+    bool hasProjection = hasProjectionMatrix();
+    if (hasProjection) {
+        return hasView ?
+            projectionMatrix() * viewMatrix() :
+            projectionMatrix();
+    } else {
+        return hasView ?
+            viewMatrix() : mat4x4(1.0f);
+    }
+}
+
+void Camera::passthrough(mat4x4 &mat) const noexcept {
+    passthroughProjection(mat);
+    passthroughView(mat);
+}
+
+void Camera::passthroughProjection(mat4x4 &mat) const noexcept {
+    mat *= projectionMatrix();
+}
+void Camera::passthroughView(mat4x4 &mat) const noexcept {
+    mat *= viewMatrix();
+}
+
+bool Camera::hasViewMatrix() const noexcept { return false;}
+bool Camera::hasProjectionMatrix() const noexcept { return false; }
 //// ---- TransformedCamera --- ////
 TransformedCamera::TransformedCamera()
 noexcept :
@@ -68,6 +125,9 @@ mat4x4 TransformedCamera::projectionMatrix()
 const noexcept {
 	return k_mat_projection;
 }
+
+bool TransformedCamera::hasViewMatrix() const noexcept { return true; }
+bool TransformedCamera::hasProjectionMatrix() const noexcept { return true; }
 
 //// ---- Camera ---- ////
 
@@ -196,6 +256,9 @@ mat4x4 Camera3D::calculateProjectionMatrix() const noexcept {
     return glm::perspective(fov, aspectRatio, nearPlane, farPlane);
 }
 
+bool Camera3D::hasViewMatrix() const noexcept { return true; }
+bool Camera3D::hasProjectionMatrix() const noexcept { return false; }
+
 //// ---- MatrixBufferedCamera3D ---- ////
 
 MatrixBufferedCamera3D::MatrixBufferedCamera3D(
@@ -301,6 +364,9 @@ mat4x4 Camera2D::calculateProjectionMatrix() const noexcept
 
 mat4x4 Camera2D::viewMatrix() const noexcept { return calculateViewMatrix(); }
 mat4x4 Camera2D::projectionMatrix() const noexcept { return calculateProjectionMatrix(); }
+
+bool Camera2D::hasViewMatrix() const noexcept { return true; }
+bool Camera2D::hasProjectionMatrix() const noexcept { return false; }
 
 // ---- MatrixBufferedCamera2D ---- //
 MatrixBufferedCamera2D::MatrixBufferedCamera2D(

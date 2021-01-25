@@ -45,6 +45,7 @@ set(PMAST_SOURCES # All source files in the PMAST project
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/parser.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/render.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/mapcanvas.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/mapworld.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/pmast/main.cc")
 set(PMAST_HEADERS # All header files in the PMAST project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/pmast.hpp"
@@ -56,6 +57,7 @@ set(PMAST_HEADERS # All header files in the PMAST project
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/osm.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/parser.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/mapcanvas.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/mapworld.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/include/pmast/render.hpp")
 set(PMAST_INCLUDE  # All includes in the PMAST projects
   "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -161,7 +163,7 @@ add_subdirectory("ext/spdlog")
 target_link_libraries(engine
   PUBLIC spdlog
   PRIVATE glfw
-  PUBLIC fmt::fmt
+  PRIVATE fmt::fmt
   PRIVATE ${CMAKE_DL_LIBS})
 target_include_directories(engine
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -170,7 +172,8 @@ target_include_directories(engine
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext/glm"
   PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/fmt/include"
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/ext/spdlog/include"
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/include")
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/glfw/include"
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/ext/earcut/include")
 
 target_link_libraries(pmast PRIVATE engine)
 target_include_directories(pmast PRIVATE ${PMAST_INCLUDE})

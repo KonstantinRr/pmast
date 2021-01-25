@@ -338,6 +338,10 @@ public:
         return *this;
     }
 
+    MeshBuilder2D& addPolygon(
+        const std::vector<vec2> &polygon,
+        const std::vector<std::vector<vec2>> &holes = {}, bool indexed=false);
+
     MeshBuilder2D& addVertices(std::initializer_list<glm::vec2> init);
     MeshBuilder2D& addTextureCoords(std::initializer_list<glm::vec2> init);
     MeshBuilder2D& addColors(std::initializer_list<glm::vec3> init);
@@ -497,7 +501,6 @@ public:
 
     size_t maxExtentIndex() const;
     size_t minExtentIndex() const;
-
     size_t maxXExtentIndex() const;
     size_t minXExtentIndex() const;
     size_t maxYExtentIndex() const;

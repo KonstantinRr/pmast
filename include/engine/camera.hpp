@@ -32,13 +32,47 @@
 
 NYREM_NAMESPACE_BEGIN
 
+class RenderContext;
+
+class ViewTransformer {
+public:
+	virtual ~ViewTransformer() = default;
+
+	virtual mat4x4 matrix() const noexcept;
+	virtual void passthrough(mat4x4 &mat) const noexcept;
+};
+
+
+class DimensionScaler : public ViewTransformer {
+protected:
+	size_t m_width, m_height;
+public:
+	DimensionScaler() noexcept;
+	virtual ~DimensionScaler() = default;
+
+	void updateMatrix(const RenderContext &context) noexcept;
+	void updateMatrix(size_t width, size_t height) noexcept;
+};
+
+class HeightScaler : public DimensionScaler {
+public:
+	virtual ~HeightScaler() = default;
+	virtual mat4x4 matrix() const noexcept override;
+};
+
+class WidthScaler : public DimensionScaler {
+public:
+	virtual ~WidthScaler() = default;
+	virtual mat4x4 matrix() const noexcept override;
+};
+
 /// <summary>
 /// General interface for all camera objects. Cameras can be used to perform arbitrary
 /// transformations in three dimensional space. Each camera needs to implement the viewMatrix
 /// and projectionMatrix functions that return the given given transformation. The default
 /// implementation returns the identity matrix for both.
 /// </summary>
-class Camera {
+class Camera : public ViewTransformer {
 public:
 	/// <summary>
 	/// Allows deleting objects using the base class.
@@ -51,6 +85,7 @@ public:
 	/// </summary>
 	/// <returns>The 4x4 view matrix</returns>
 	virtual mat4x4 viewMatrix() const noexcept;
+	virtual void passthroughView(mat4x4 &mat) const noexcept;
 
 	/// <summary>
 	/// Creates the projection matrix associated with this Camera.
@@ -58,6 +93,13 @@ public:
 	/// </summary>
 	/// <returns>The 4x4 projection matrix</returns>
 	virtual mat4x4 projectionMatrix() const noexcept;
+	virtual void passthroughProjection(mat4x4 &mat) const noexcept;
+
+	virtual mat4x4 matrix() const noexcept override;
+	virtual void passthrough(mat4x4 &mat) const noexcept override;
+
+	virtual bool hasViewMatrix() const noexcept;
+	virtual bool hasProjectionMatrix() const noexcept;
 };
 
 /// <summary>
@@ -98,6 +140,9 @@ public:
 	/// <summary>Overriden method from Camera::projectionMatrix</summary>
 	/// <returns>The projection matrix that was previously set</returns>
 	virtual mat4x4 projectionMatrix() const noexcept override;
+
+	virtual bool hasViewMatrix() const noexcept override;
+	virtual bool hasProjectionMatrix() const noexcept override;
 
 protected:
 	/// <summary>Stores the view  matrix</summary>
@@ -248,6 +293,9 @@ public:
 	/// </summary>
 	mat4x4 calculateProjectionMatrix() const noexcept;
 
+	virtual bool hasViewMatrix() const noexcept override;
+	virtual bool hasProjectionMatrix() const noexcept override;
+
 protected:
 	float nearPlane, farPlane, fov, aspectRatio;
 	vec3 position, rotation;
@@ -393,6 +441,9 @@ public:
 
 	mat4x4 viewMatrix() const noexcept;
 	mat4x4 projectionMatrix() const noexcept;
+
+	virtual bool hasViewMatrix() const noexcept override;
+	virtual bool hasProjectionMatrix() const noexcept override;
 
 protected:
 	float k_rotation, k_zoom;

@@ -315,8 +315,10 @@ void TickerList::updateAll(float dt) {
 }
 
 RectStageBuffer::RectStageBuffer(
-    const RenderList<TransformableEntity2D>& renderList)
-    : renderList(renderList) { }
+    const RenderList<TransformableEntity2D>& renderList,
+    const std::shared_ptr<const Camera> &camera)
+    : renderList(renderList), camera(camera) { }
+
 
 // ---- RectShader ---- //
 RectShader::RectShader()
@@ -341,15 +343,25 @@ RectShader& RectShader::operator=(RectShader &&sh)
     return *this;
 }
 
-void RectShader::render(const RenderList<TransformableEntity2D>& renderList) {
+void RectShader::render(
+    const RenderList<TransformableEntity2D>& renderList,
+    const std::shared_ptr<const Camera> &camera) {
     bind();
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glActiveTexture(GL_TEXTURE0);
     loadTexture(0);
 
+    nyrem::mat4x4 transformCam;
+    if (camera)
+        transformCam = camera->projectionMatrix() * camera->viewMatrix();
+    
     for (auto& entity : renderList) {
-        loadTransform(entity->calculateTransformationMatrix());
+        if (camera)
+            loadTransform(transformCam * entity->calculateTransformationMatrix());
+        else
+            loadTransform(entity->calculateTransformationMatrix());
+        
         if (entity->getColorStorage().hasColor()) {
             loadUseColor(true);
             loadColor(entity->getColorStorage()[0]);
@@ -367,7 +379,7 @@ void RectShader::render(const RenderList<TransformableEntity2D>& renderList) {
 }
 
 void RectShader::render(const RectStageBuffer& renderList) {
-    render(renderList.renderList);
+    render(renderList.renderList, renderList.camera);
 }
 
 void RectShader::loadColor(nyrem::vec3 color) { loadVec3(uniformColor, color); }
@@ -393,6 +405,7 @@ MVPListStageBuffer::MVPListStageBuffer(
     const std::shared_ptr<RenderList<Entity>>& pList)
     : camera(pCamera), list(pList) { }
 
+// ---- SimpleMVPShader ---- //
 SimpleMVPShader::SimpleMVPShader() : ShaderBase(true, true) { }
 
 SimpleMVPShader::SimpleMVPShader(SimpleMVPShader&& sh) : ShaderBase(std::move(sh)),
@@ -712,6 +725,9 @@ void main(void) {
 })";
 */
 
+//// ---- MemoryRectShader ---- ////
+MemoryRectShader::MemoryRectShader() : RectShader() { }
+
 std::vector<char> MemoryRectShader::retrieveFragmentShader()
 {
     const char * frag = R"(
@@ -725,7 +741,7 @@ std::vector<char> MemoryRectShader::retrieveFragmentShader()
     uniform int u_useColor;
 
     void main(){
-        if (u_useColor != 0) {
+        if (u_useColor == 0) {
             color = texture(textureSampler, texturePosition);
         } else {
             color = vec4(u_color, 1.0);
@@ -787,6 +803,10 @@ void TriangleShader::render(const TriangleStageBuffer &stageBuffer)
     }
     release();
 }
+
+//// ---- TriangleMemoryShader ---- ////
+TriangleMemoryShader::TriangleMemoryShader()
+    : TriangleShader() { }
 
 std::vector<char> TriangleMemoryShader::retrieveVertexShader()
 {
@@ -853,6 +873,7 @@ std::vector<char> SimpleMVPMemoryShader::retrieveFragmentShader()
     return toArray(frag);
 }
 
+//// ---- LineShader ---- ////
 LineShader::LineShader()
     : ShaderBase(true, true) { }
 
@@ -887,6 +908,9 @@ void LineShader::render(const LineStageBuffer& stageBuffer)
     }
     release();
 }
+//// ---- LineMemoryShader ---- ////
+LineMemoryShader::LineMemoryShader()
+    : LineShader() { }
 
 std::vector<char> LineMemoryShader::retrieveVertexShader()
 {

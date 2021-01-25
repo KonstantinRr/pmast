@@ -127,6 +127,8 @@ public:
 	
 	Rect rect() const; 
 
+	nyrem::Camera asCamera() const noexcept;
+
 	// ---- Callbacks ---- //
 	inline nyrem::Listener<void(glm::dvec2)>& cb_leftclick() { return m_cb_leftclick; }
 	inline nyrem::Listener<void(glm::dvec2)>& cb_rightclick() { return m_cb_rightclick; }
@@ -182,7 +184,7 @@ protected:
 		nyrem::RectShader>> rect_comp;
 	std::shared_ptr<nyrem::RenderComponent<
 		nyrem::LineStageBuffer,
-		nyrem::LineMemoryShader>> l_comp;
+		nyrem::LineShader>> l_comp;
 
 	std::shared_ptr<nyrem::GLModel> m_model;
 
@@ -190,8 +192,6 @@ protected:
 
 	std::shared_ptr<traffic::OSMSegment> m_map;
 	std::shared_ptr<traffic::OSMSegment> m_highway_map;
-
-	nyrem::Camera2D m_camera;
 
 	// stores the plane coordinates
 	glm::dvec2 position;
