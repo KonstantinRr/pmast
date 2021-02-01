@@ -24,132 +24,701 @@
 /// July 2020
 
 #pragma once
-
-#ifndef NYREM_CAMERA_H
-#define NYREM_CAMERA_H
+//export module nyrem:camera;
 
 #include <engine/internal.hpp>
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 NYREM_NAMESPACE_BEGIN
-
-class RenderContext;
 
 class ViewTransformer {
 public:
 	virtual ~ViewTransformer() = default;
 
-	virtual mat4x4 matrix() const noexcept;
-	virtual void passthrough(mat4x4 &mat) const noexcept;
+	virtual mat4x4 matrix() const noexcept { return mat4x4(1.0f); }
+	virtual mat4x4 inverse() const noexcept { return mat4x4(1.0f); }
+	virtual void passthrough(mat4x4 &mat) const noexcept { }
+	virtual void passthrough(vec4 &vec) const noexcept { }
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept { }
+	virtual void passthroughInverse(vec4 &vec) const noexcept { }
 };
 
+class ViewPipeline : public ViewTransformer {
+public:
+	virtual ~ViewPipeline() = default;
 
-class DimensionScaler : public ViewTransformer {
+	virtual mat4x4 projectionMatrix() const noexcept { return mat4x4(1.0f); }
+	virtual mat4x4 viewMatrix() const noexcept { return mat4x4(1.0f); }
+};
+
+class CalculateMatrix {
+public:
+	constexpr bool hasBuffer() const { return false; }
+};
+
+class BufferMatrix {
+protected:
+	mutable mat4x4 buffer;
+
+public:
+	BufferMatrix() noexcept = default;
+
+	constexpr bool hasBuffer() const { return true; }
+
+	inline void store(const mat4x4 &mat) const noexcept { buffer = mat; }
+	inline const mat4x4& get() const noexcept { return buffer; }
+};
+
+template<typename ForwardBuffer, typename BackwardBuffer>
+class MatrixBuffer {
+protected:
+	ForwardBuffer m_bufferForward;
+	BackwardBuffer m_bufferBackward;
+	mutable bool m_dirtyForward;
+	mutable bool m_dirtyBackward;
+
+	template<typename Buffer, typename Exec>
+	mat4x4 bufferOrMatrix(const Buffer &buffer, bool &dirty, Exec && exec) const noexcept {
+		if constexpr (buffer.hasBuffer()) {
+			if (dirty) {
+				auto storeMatrix = exec();
+				buffer.store(storeMatrix);
+				dirty = false;
+				return storeMatrix;
+			} else {
+				return buffer.get();
+			}
+		} else {
+			return exec();
+		}
+	}
+
+public:
+	MatrixBuffer() noexcept :
+		m_dirtyForward(true), m_dirtyBackward(true) { }
+	virtual ~MatrixBuffer() = default;
+
+	inline bool isDirtyForward() const noexcept { return m_dirtyForward; }
+	inline bool isDirtyBackward() const noexcept { return m_dirtyBackward; }
+
+	inline void makeDirtyForward() const noexcept { m_dirtyForward = true; }
+	inline void makeDirtyBackward() const noexcept { m_dirtyBackward = true; }
+	inline void makeDirty() const noexcept {
+		m_dirtyForward = true;
+		m_dirtyBackward = true;
+	}
+
+	template<typename Exec>
+	inline mat4x4 forwardBufferOrMatrix(Exec && exec) const noexcept {
+		return bufferOrMatrix(m_bufferForward, m_dirtyForward, exec);
+	}
+
+	template<typename Exec>
+	inline mat4x4 backwardBufferOrMatrix(Exec && exec) const noexcept {
+		return bufferOrMatrix(m_bufferBackward, m_dirtyBackward, exec);
+	}
+};
+
+template<typename ForwardBuffer, typename BackwardBuffer>
+class DimensionScaler :
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<ForwardBuffer, BackwardBuffer>;
+
 protected:
 	size_t m_width, m_height;
+
 public:
-	DimensionScaler() noexcept;
+	DimensionScaler() noexcept : m_width(1), m_height(1) { }
+	DimensionScaler(size_t width, size_t height) noexcept :
+		m_width(width), m_height(height) { }
 	virtual ~DimensionScaler() = default;
 
-	void updateMatrix(const RenderContext &context) noexcept;
-	void updateMatrix(size_t width, size_t height) noexcept;
+	float aspectRatio() const noexcept {
+		return static_cast<float>(m_width) / static_cast<float>(m_height);
+	}
+	float inverseAspectRatio() const noexcept {
+		return static_cast<float>(m_height) / static_cast<float>(m_width);
+	}
+
+	void setWidth(size_t width) noexcept {
+		m_width = width;
+    	TypeMatrixBuffer::makeDirty();
+	}
+	void setHeight(size_t height) noexcept {
+		m_height = height;
+    	TypeMatrixBuffer::makeDirty();
+	}
+
+	void updateMatrix(size_t width, size_t height) noexcept {
+		m_width = width;
+		m_height = height;
+		TypeMatrixBuffer::makeDirty();
+	}
 };
 
-class HeightScaler : public DimensionScaler {
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class HeightScaler :
+	public ViewTransformer,
+	public DimensionScaler<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeDimensionScaler = DimensionScaler<ForwardBuffer, BackwardBuffer>;
+
+protected:
+	mat4x4 heightScalerMatrixForward() const noexcept {
+		return TypeDimensionScaler::TypeMatrixBuffer::forwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f),
+        	    {this->widthScaleFactorForward(), 1.0f, 1.0f}); });
+	}
+	mat4x4 heightScalerMatrixBackward() const noexcept {
+		return TypeDimensionScaler::TypeMatrixBuffer::forwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f),
+        	    {this->widthScaleFactorBackward(), 1.0f, 1.0f}); });
+	}
+
+	inline float widthScaleFactorForward() const noexcept {
+		return TypeDimensionScaler::inverseAspectRatio();
+	}
+	inline float widthScaleFactorBackward() const noexcept {
+		return TypeDimensionScaler::aspectRatio();
+	}
+
 public:
 	virtual ~HeightScaler() = default;
-	virtual mat4x4 matrix() const noexcept override;
+	
+	virtual mat4x4 matrix() const noexcept override {
+		return heightScalerMatrixForward();
+	}
+	virtual mat4x4 inverse() const noexcept override {
+		return heightScalerMatrixBackward();
+	}
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, {widthScaleFactorForward(), 1.0f, 1.0f});
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		vec[0] *= widthScaleFactorForward();
+	}
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, {widthScaleFactorBackward(), 1.0f, 1.0f});
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		vec[0] *= widthScaleFactorBackward();
+	}
 };
 
-class WidthScaler : public DimensionScaler {
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class WidthScaler :
+	public ViewTransformer,
+	public DimensionScaler<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeDimensionScaler = DimensionScaler<ForwardBuffer, BackwardBuffer>;
+
+protected:
+	mat4x4 widthScalerMatrixForward() const noexcept {
+		return forwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f),
+        	    {1.0f, this->heightScaleFactorForward(), 1.0f}); });
+	}
+	mat4x4 widthScalerMatrixBackward() const noexcept {
+		return backwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f),
+        	    {1.0f, this->heightScaleFactorBackward(), 1.0f}); });
+	}
+	inline float heightScaleFactorForward() const noexcept {
+		return TypeDimensionScaler::aspectRatio();
+	}
+	inline float heightScaleFactorBackward() const noexcept {
+		return TypeDimensionScaler::inverseAspectRatio();
+	}
+
 public:
 	virtual ~WidthScaler() = default;
-	virtual mat4x4 matrix() const noexcept override;
-};
 
-/// <summary>
-/// General interface for all camera objects. Cameras can be used to perform arbitrary
-/// transformations in three dimensional space. Each camera needs to implement the viewMatrix
-/// and projectionMatrix functions that return the given given transformation. The default
-/// implementation returns the identity matrix for both.
-/// </summary>
-class Camera : public ViewTransformer {
-public:
-	/// <summary>
-	/// Allows deleting objects using the base class.
-	/// </summary>
-	virtual ~Camera() = default;
-
-	/// <summary>
-	/// Creates the view matrix associated with this Camera.
-	/// The default implementation returns the identity matrix.
-	/// </summary>
-	/// <returns>The 4x4 view matrix</returns>
-	virtual mat4x4 viewMatrix() const noexcept;
-	virtual void passthroughView(mat4x4 &mat) const noexcept;
-
-	/// <summary>
-	/// Creates the projection matrix associated with this Camera.
-	/// The default implementation returns the identity matrx.
-	/// </summary>
-	/// <returns>The 4x4 projection matrix</returns>
-	virtual mat4x4 projectionMatrix() const noexcept;
-	virtual void passthroughProjection(mat4x4 &mat) const noexcept;
-
-	virtual mat4x4 matrix() const noexcept override;
-	virtual void passthrough(mat4x4 &mat) const noexcept override;
-
-	virtual bool hasViewMatrix() const noexcept;
-	virtual bool hasProjectionMatrix() const noexcept;
+	virtual mat4x4 matrix() const noexcept override {
+		return widthScalerMatrixForward();
+	}
+	virtual mat4x4 inverse() const noexcept override {
+		return widthScalerMatrixBackward();
+	}
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, {1.0f, heightScaleFactorForward(), 1.0f});
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		vec[1] *= heightScaleFactorForward();
+	}
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, {1.0f, heightScaleFactorBackward(), 1.0f});
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		vec[1] *= heightScaleFactorBackward();
+	}
 };
 
 /// <summary>
 /// The transformed camera implements fixed view and projection transformations.
 /// They can be changed by using the setViewMatrix and setProjectionMatrix functions.
 /// </summrary>
-class TransformedCamera : public Camera {
+template<typename BackwardBuffer = CalculateMatrix>
+class TransformedCamera :
+	public ViewTransformer,
+	protected MatrixBuffer<CalculateMatrix, BackwardBuffer> {
 public:
-	/// <summary>
-	/// Creates a Camera with the identity matrix as view and projection matrix.
-	/// </summary>
-	TransformedCamera() noexcept;
-
-	/// <summary>
-	/// Creates a Camera with the given view and projection matrix.
-	/// </summary>
-	/// <param name="view">The fixed view matrix</param>
-	/// <param name="proj">The fixed projection matrix</param>
-	TransformedCamera(const mat4x4 &view, const mat4x4 &proj) noexcept;
-
-	/// <summary>
-	/// Allows deleting objects using the base class.
-	/// </summary>
-	virtual ~TransformedCamera() = default;
-
-	/// <summary>Sets the view matrix</summary>
-	/// <param name="mat">The new 4x4 view matrix</param>
-	void setViewMatrix(const glm::mat4x4& mat) noexcept;
-
-	/// <summary>Sets the projection matrix</summary>
-	/// <param name="mat">The new 4x4 projection matrix</param>
-	void setProjectionMatrix(const glm::mat4x4& mat) noexcept;
-
-	/// <summary>Overriden method from Camera::viewMatrix</summary>
-	/// <returns>The view matrix that was previously set</returns>
-	virtual mat4x4 viewMatrix() const noexcept override;
-	
-	/// <summary>Overriden method from Camera::projectionMatrix</summary>
-	/// <returns>The projection matrix that was previously set</returns>
-	virtual mat4x4 projectionMatrix() const noexcept override;
-
-	virtual bool hasViewMatrix() const noexcept override;
-	virtual bool hasProjectionMatrix() const noexcept override;
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
 
 protected:
-	/// <summary>Stores the view  matrix</summary>
-	mat4x4 k_mat_view;
-	/// <summary>Stores the projection matrix</summary>
-	mat4x4 k_mat_projection;
+	mat4x4 m_matrix;
+
+	mat4x4 inverseCameraMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix(
+			[this]() { return glm::inverse(this->get()); });
+	}
+
+public:
+	TransformedCamera() noexcept : m_matrix(1.0f) { }
+	TransformedCamera(const mat4x4 &transform) noexcept
+		: m_matrix(transform) { }
+
+	virtual ~TransformedCamera() = default;
+
+	inline void set(const mat4x4 &mat) noexcept {
+		m_matrix = mat;
+		TypeMatrixBuffer::makeDirty();
+	}
+	inline const mat4x4& get() const noexcept { return m_matrix; }
+
+	virtual mat4x4 matrix() const noexcept override {return m_matrix; }
+	virtual mat4x4 inverse() const noexcept override { return inverseCameraMatrix(); }
+	virtual void passthrough(mat4x4 &mat) const noexcept override { mat = m_matrix * mat; }
+	virtual void passthrough(vec4 &vec) const noexcept override { vec = m_matrix * vec; }
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override { mat = inverseCameraMatrix() * mat; }
+	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = inverseCameraMatrix() * vec; }
 };
+
+template<typename BackwardBuffer = CalculateMatrix>
+class TransformedInverseCamera :
+	public ViewTransformer,
+	protected MatrixBuffer<CalculateMatrix, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	mat4x4 m_inverse_matrix;
+
+	mat4x4 cameraMatrix() const noexcept {
+		return forwardBufferOrMatrix(
+			[this]() { return glm::inverse(this->m_inverse_matrix); });
+	} 
+
+public:
+	TransformedInverseCamera() noexcept : m_inverse_matrix(1.0f) { }
+	TransformedInverseCamera(const mat4x4 &transform) noexcept
+		: m_inverse_matrix(transform) { }
+
+	virtual ~TransformedInverseCamera() = default;
+
+	void set(const mat4x4 &mat) noexcept {
+		m_inverse_matrix = mat;
+		TypeMatrixBuffer::makeDirty();
+	}
+	inline const mat4x4 get() const noexcept { return m_inverse_matrix; }
+
+	virtual mat4x4 matrix() const noexcept override { return cameraMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return m_inverse_matrix; }
+	virtual void passthrough(mat4x4 &mat) const noexcept override { mat = cameraMatrix() * mat; }
+	virtual void passthrough(vec4 &vec) const noexcept override { vec = cameraMatrix() * vec; }
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override { mat = m_inverse_matrix * mat; }
+	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = m_inverse_matrix * vec; }
+};
+
+template<
+	typename ForwardBuffer = BufferMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Projection3D :
+	public ViewTransformer,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	float m_nearPlane;
+	float m_farPlane;
+	float m_fov;
+	float m_aspectRatio;
+
+	mat4x4 projectionMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix([this]() {
+			return glm::perspective(
+				m_fov, m_aspectRatio, m_nearPlane, m_farPlane); });
+	}
+
+	mat4x4 inverseProjectionMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix([this]() {
+			return glm::inverse(glm::perspective(
+				m_fov, m_aspectRatio, m_nearPlane, m_farPlane)); });
+	}
+
+public:
+	Projection3D() noexcept :
+		m_nearPlane(0.01f), m_farPlane(100.0f),
+		m_fov(90.0f), m_aspectRatio(1.0f) { }
+
+	Projection3D(float nearPlane, float farPlane,
+		float fov, float aspectRatio) noexcept :
+    	m_nearPlane(nearPlane), m_farPlane(farPlane),
+    	m_fov(fov), m_aspectRatio(aspectRatio) { }
+
+	virtual ~Projection3D() = default;
+
+	void setNearPlane(float nearPlane) {
+		m_nearPlane = nearPlane;
+		TypeMatrixBuffer::makeDirty();
+	}
+	void setFarPlane(float farPlane) {
+		m_farPlane = farPlane;
+		TypeMatrixBuffer::makeDirty();
+	}
+	void setFOV(float fov) {
+		m_fov = fov;
+		TypeMatrixBuffer::makeDirty();
+	}
+	void setAspectRatio(float aspectRatio) {
+		m_aspectRatio = aspectRatio;
+		TypeMatrixBuffer::makeDirty();
+	}
+
+	virtual mat4x4 matrix() const noexcept override { return projectionMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseProjectionMatrix(); }
+	virtual void passthrough(mat4x4 &mat) const noexcept override { mat = projectionMatrix() * mat; }
+	virtual void passthrough(vec4 &vec) const noexcept override { vec = projectionMatrix() * vec; }
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override { mat = inverseProjectionMatrix() * mat; }
+	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = inverseProjectionMatrix() * vec; }
+};
+
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Translation3D :
+	public ViewTransformer, 
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	vec3 m_position;
+
+	mat4x4 translationMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+			[this]() { return glm::translate(mat4x4(1.0f), m_position); });
+	}
+	mat4x4 inverseTranslationMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix(
+			[this]() { return glm::translate(mat4x4(1.0f), -m_position); });
+	}
+
+public:
+	Translation3D() noexcept : m_position(0.0f) { }
+	Translation3D(float v) noexcept : m_position(v) { }
+	Translation3D(float x, float y, float z) noexcept : m_position(x, y, z) { }
+	Translation3D(const vec3& pos) noexcept : m_position(pos) { }
+
+	void set(vec3 position) {
+		m_position = position;
+		TypeMatrixBuffer::makeDirty();
+	}
+
+	virtual ~Translation3D() = default;
+
+	virtual mat4x4 matrix() const noexcept override { return translationMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseTranslationMatrix(); }
+	
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		mat = glm::translate(mat, m_position);
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		vec.x += m_position.x;
+		vec.y += m_position.y;
+		vec.z += m_position.z;
+	}
+
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		mat = glm::translate(mat, -m_position);
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		vec.x -= m_position.x;
+		vec.y -= m_position.y;
+		vec.z -= m_position.z;
+	}
+};
+
+template<
+	typename ForwardBuffer = BufferMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Rotation3D :
+	public ViewTransformer,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	quat m_quaternion;
+
+	mat4x4 rotationMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+        	[this]() { return glm::toMat4(m_quaternion); });
+	}
+	mat4x4 inverseRotationMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix(
+        	[this]() { return glm::inverse(glm::toMat4(m_quaternion)); });
+	}
+
+public:
+	Rotation3D() = default;
+	Rotation3D(float roll, float pitch, float yaw) noexcept :
+		m_quaternion({roll, pitch, yaw}) { }
+	Rotation3D(const vec3 &euler) noexcept :
+		m_quaternion(euler) { }
+	Rotation3D(float w, float x, float y, float z) noexcept :
+		m_quaternion(w, x, y, z) { }
+
+	Rotation3D(const vec4 &quat) noexcept :
+		m_quaternion(quat) { }
+	Rotation3D(const quat &quaternion) noexcept :
+		m_quaternion(quaternion) { }
+	~Rotation3D() = default;
+
+	void set(float roll, float pitch, float yaw) {
+		m_quaternion = quat({roll, pitch, yaw});
+		TypeMatrixBuffer::makeDirty();
+	}
+	void set(vec3 vec) {
+		m_quaternion = quat(vec);
+		TypeMatrixBuffer::makeDirty();
+	}
+
+	void set(float w, float x, float y, float z) {
+		m_quaternion = quat(w, x, y, z);
+		TypeMatrixBuffer::makeDirty();
+	}
+	void set(vec4 vec) {
+		m_quaternion = quat(vec);
+		TypeMatrixBuffer::makeDirty();
+	}
+	void set(quat quaternion) {
+		m_quaternion = quaternion;
+		TypeMatrixBuffer::makeDirty();
+	}
+
+	virtual mat4x4 matrix() const noexcept override { return rotationMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseRotationMatrix(); }
+	virtual void passthrough(mat4x4 &mat) const noexcept override { mat = rotationMatrix() * mat; }
+	virtual void passthrough(vec4 &vec) const noexcept override { vec = rotationMatrix() * vec; }
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override { mat = inverseRotationMatrix() * mat; }
+	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = inverseRotationMatrix() * vec; }
+};
+
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Translation2D :
+	public ViewTransformer,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<ForwardBuffer, BackwardBuffer>;
+
+protected:
+	vec2 m_translation;
+
+	mat4x4 translationMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+			[this]() { glm::translate(mat4x4(1.0f), vec3(m_translation, 0.0f)); });
+	}
+	mat4x4 inverseTranslationMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix(
+			[this]() { glm::translate(mat4x4(1.0f), vec3(-m_translation, 0.0f)); });
+	}
+public:
+	Translation2D() noexcept : m_translation(0.0f) { }
+	Translation2D(float v) noexcept : m_translation(v) { }
+	Translation2D(float x, float y) noexcept : m_translation(x, y) { }
+	Translation2D(const vec2& pos) noexcept : m_translation(pos) { }
+
+	void set(vec2 translation) {
+		m_translation = translation;
+		TypeMatrixBuffer::makeDirty();
+	}
+
+	virtual ~Translation2D() = default;
+
+	virtual mat4x4 matrix() const noexcept override { return translationMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseTranslationMatrix(); }
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		mat = glm::translate(mat, vec3(m_translation, 0.0f));
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		vec.x += m_translation.x;
+		vec.y += m_translation.y;
+	}
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		mat = glm::translate(mat, vec3(-m_translation, 0.0f));
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		vec.x -= m_translation.x;
+		vec.y -= m_translation.y;
+	}
+};
+
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Rotation2D :
+	public ViewTransformer,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	float m_rotation;
+
+	mat4x4 rotationMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+			[this]() { glm::rotate(m_rotation, vec3{0.0f, 1.0f, 0.0f}); });
+	}
+
+	mat4x4 inverseRotationMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+			[this]() { glm::rotate(-m_rotation, vec3{0.0f, 1.0f, 0.0f}); });
+	}
+
+public:
+	Rotation2D() noexcept : m_rotation(0.0f) { }
+	Rotation2D(float vec) noexcept : m_rotation(vec) { }
+	virtual ~Rotation2D() = default;
+
+	void set(float rotation) {
+		m_rotation = rotation;
+		TypeMatrixBuffer::makeDirty();
+	}
+	float get() const noexcept { return m_rotation; }
+
+	virtual mat4x4 matrix() const noexcept override { return rotationMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseRotationMatrix(); }
+	virtual void passthrough(mat4x4 &mat) const noexcept override { mat = rotationMatrix() * mat; }
+	virtual void passthrough(vec4 &vec) const noexcept override { vec = rotationMatrix() * vec; }
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override { mat = rotationMatrix() * mat; }
+	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = rotationMatrix() * vec; }
+};
+
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Scale3D :
+	public ViewTransformer,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	vec3 m_scale;
+
+	vec3 inverseScaleVector() const noexcept {
+		return {1.0 / m_scale.x, 1.0f / m_scale.y, 1.0f / m_scale.z};
+	}
+
+	mat4x4 scaleMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f), m_scale); });
+	}
+	mat4x4 inverseScaleMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f), inverseScaleVector()); });
+	}
+
+public:
+	Scale3D() noexcept : m_scale(1.0f) { }
+	Scale3D(float x, float y, float z) noexcept : m_scale(x, y) { }
+	Scale3D(vec3 scale) noexcept : m_scale(scale) { }
+	virtual ~Scale3D() = default;
+
+	virtual mat4x4 matrix() const noexcept override { return scaleMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseScaleMatrix(); }
+	
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, m_scale);
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		vec.x *= m_scale.x;
+		vec.y *= m_scale.y;
+		vec.z *= m_scale.z;
+	}
+
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, inverseScaleVector());
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		vec.x /= m_scale.x;
+		vec.y /= m_scale.y;
+		vec.z /= m_scale.z;
+	}
+};
+
+template<
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
+class Scale2D :
+	public ViewTransformer,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
+public:
+	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+
+protected:
+	vec2 m_scale;
+
+	vec2 inverseScaleVector() const noexcept {
+		return { 1.0f / m_scale.x, 1.0f / m_scale.y };
+	}
+
+	mat4x4 scaleMatrix() const noexcept {
+		return TypeMatrixBuffer::forwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f), vec3(m_scale, 1.0f)); });
+	}
+	mat4x4 inverseScaleMatrix() const noexcept {
+		return TypeMatrixBuffer::backwardBufferOrMatrix(
+        	[this]() { return glm::scale(mat4x4(1.0f), vec3(inverseScaleVector(), 1.0f)); });
+	}
+
+public:
+	Scale2D() noexcept : m_scale(1.0f) { }
+	Scale2D(float x, float y) noexcept : m_scale(x, y) { }
+	Scale2D(vec2 scale) noexcept : m_scale(scale) { }
+	virtual ~Scale2D() = default;
+
+	virtual mat4x4 matrix() const noexcept override { return scaleMatrix(); }
+	virtual mat4x4 inverse() const noexcept override { return inverseScaleMatrix(); }
+	
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, vec3(m_scale, 1.0f));
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		vec.x *= m_scale.x;
+		vec.y *= m_scale.y;
+	}
+	
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		mat = glm::scale(mat, vec3(inverseScaleVector(), 1.0f));
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		vec.x /= m_scale.x;
+		vec.y /= m_scale.y;
+	}
+};
+
 
 /// <summary>
 /// A three dimensional camera that can be used to emulate a view position, angle,
@@ -159,333 +728,160 @@ protected:
 /// projectionMatrix() or viewMatrix(). See MatrixBufferedCamera3D for an
 /// implementation that caches the matrices.
 /// </summary>
-class Camera3D : public Camera {
+template<
+	typename ForwardBuffer = BufferMatrix,
+	typename BackwardBuffer = BufferMatrix>
+class Camera3D :
+	public ViewPipeline,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
 public:
-	/// <summary>
-	/// Creates a camera with the following default settings: 
-	/// nearPlane   = 0.01f
-	/// farPlane    = 100.0f
-	/// fov         = 90.0f
-	/// aspectRatio = 1.0f
-	/// position    = (0.0f, 0.0f, 0.0f)
-	/// rotation    = (0.0f, 0.0f, 0.0f)
-	/// </summary>
-	Camera3D() noexcept;
+	using TypeTranslation3D = Translation3D<CalculateMatrix, CalculateMatrix>;
+	using TypeProjection3D = Projection3D<BufferMatrix, BufferMatrix>;
+	using TypeRotation3D = Rotation3D<CalculateMatrix, CalculateMatrix>;
 
-	/// <summary>
-	/// Creates a camera using the given render settings. Position and rotation are
-	/// initialized with a the default value of (0.0f, 0.0f, 0.0f).
-	/// </summary>
-	/// <param name="nearPlane">The camera's near plane</param>
-	/// <param name="farPlane">The camera's far plane</param>
-	/// <param name="fov">The field of view angle in radians</param>
-	/// <param name="aspectRatio">The viewports's aspect ratio</param>
+protected:
+	TypeProjection3D m_projection;
+	TypeTranslation3D m_translation;
+	TypeRotation3D m_rotation;
+
+	template<typename Type>
+	void passthroughCamera3D(Type &val) {
+		m_projection.passthrough(val); // TODO check
+    	m_translation.passthrough(val);
+    	m_rotation.passthrough(val);
+	}
+	template<typename Type>
+	void passthroughInverseCamera3D(Type &val) {
+		m_rotation.passthroughInverse(val); // TODO check
+    	m_translation.passthroughInverse(val);
+    	m_projection.passthroughInverse(val);
+	}
+
+public:
+	Camera3D() noexcept = default;
 	Camera3D(
-		float nearPlane, float farPlane,
-		float fov, float aspectRatio) noexcept;
+		const TypeProjection3D &projection,
+		const TypeTranslation3D &translation,
+		const TypeRotation3D &rotation);
 
-	/// <summary>
-	/// Creates a camera using the given render settings.
-	/// </summary>
-	/// <param name="nearPlane">The camera's near plane</param>
-	/// <param name="farPlane">The camera's far plane</param>
-	/// <param name="fov">The field of view angle in radians</param>
-	/// <param name="aspectRatio">The viewport's aspect ratio</param>
-	/// <param name="position">The camera's position</param>
-	/// <param name="rotation">The camera's rotation</param>
-	Camera3D(
-		float nearPlane, float farPlane,
-		float fov, float aspectRatio,
-		const vec3& position,
-		const vec3& rotation) noexcept;
-
-	/// <summary
-	/// Creates a camera using the given render settings.
-	/// </summary>
-	/// <param name="nearPlane">The camera's near plane</param>
-	/// <param name="farPlane">The camera's far plane</param>
-	/// <param name="fov">The field of view angle in radians</param>
-	/// <param name="aspectRatio">The viewport's aspect ratio</param>
-	/// <param name="position">The camera's position</param>
-	/// <param name="roll">The camera's roll angle, same as rotation[0]</param>
-	/// <param name="pitch">The camera's pitch angle, same as rotation[1]</param>
-	/// <param name="yaw">The camera's yaw angle, same as rotation[2]</param>
-	Camera3D(
-		float nearPlane, float farPlane,
-		float fov, float aspectRatio,
-		const vec3& position,
-		float roll, float pitch, float yaw) noexcept;
-
-	/// <summary>
-	/// Allows deleting child classes using the base class
-	/// </summary>
 	virtual ~Camera3D() = default;
 
-	// ---- Render Parameters ---- //
-	// Manipulating the basic render parameters
-	Camera3D& setNearPlane(float nearPlane) noexcept;
-	Camera3D& setFarPlane(float farPlane) noexcept;
-	Camera3D& setFOV(float fov) noexcept;
-	Camera3D& setAspectRatio(float aspect) noexcept;
-	Camera3D& setAspectRatio(int width, int height) noexcept;
-
-	// Finds the basic basic render parameters
-	float getNearPlane() const noexcept;
-	float getFarPlane() const noexcept;
-	float getFOV() const noexcept;
-	float getAspectRatio() const noexcept;
-
-	// ---- Angle Parameters ---- //
-	// Manipulating the rotation parameters
-	Camera3D& setRoll(float roll) noexcept;
-	Camera3D& setPitch(float pitch) noexcept;
-	Camera3D& setYaw(float yaw) noexcept;
-	Camera3D& changeRoll(float roll) noexcept;
-	Camera3D& changePitch(float pitch) noexcept;
-	Camera3D& changeYaw(float yaw) noexcept;
-	Camera3D& setRotation(const vec3& rotation) noexcept;
-	Camera3D& rotate(const vec3& model) noexcept;
-
-	// Finds the camera angles
-	float getRoll() const noexcept;
-	float getPitch() const noexcept;
-	float getYaw() const noexcept;
-	vec3 getRotation() const noexcept;
-
-	// ---- Position ---- //
-	float getX() const noexcept;
-	float getY() const noexcept;
-	float getZ() const noexcept;
-	glm::vec3 getPosition() const noexcept;
-
-	// Allows manipulating the position parameters
-	Camera3D& setX(float x) noexcept;
-	Camera3D& setY(float y) noexcept;
-	Camera3D& setZ(float z) noexcept;
-	Camera3D& setPosition(const vec3& model) noexcept;
-	Camera3D& move(const vec3& model) noexcept;
-
 	// ---- Complex Functions ---- //
+	void lookAt(const vec3 &pos, const vec3 &dest, const vec3 &up) noexcept;
 
-	/// <summary>Calculates the camera's view direction</summary>
-	/// <returns>The view direction vector</returns>
-	vec3 getViewDirection() const noexcept;
-	/// <summary>Calculates the camera's cross direction vector.</summary>
-	/// <returns>The cross dimensional vector</returns>
-	vec3 getViewCrossDirection() const noexcept;
+	// ---- Const access modifiers ---- //
+	inline const TypeProjection3D& projection() const noexcept { return m_projection; }
+	inline const TypeTranslation3D& translation() const noexcept { return m_translation; }
+	inline const TypeRotation3D& rotation() const noexcept { return m_rotation; }
+	// ---- access modifiers ---- //
+	inline TypeProjection3D& projection() noexcept { return m_projection; }
+	inline TypeTranslation3D& translation() noexcept { return m_translation; }
+	inline TypeRotation3D& rotation() noexcept { return m_rotation; }
 
-	/// <summary>Overriden method from Camera::viewMatrix</summary>
-	/// <returns>The newly calculated view matrix from the view settings</returns>
-	virtual mat4x4 viewMatrix() const noexcept override;
+	virtual mat4x4 projectionMatrix() const noexcept override { return m_projection.matrix(); }
+	virtual mat4x4 viewMatrix() const noexcept override {
+		mat4x4 mat(1.0f);
+		m_translation.passthrough(mat); // TODO check
+		m_rotation.passthrough(mat);
+		return mat;
+	}
 
-	/// <summary>Overriden method from Camera::projectionMatrix</summary>
-	/// <returns>The newly calculated projection matrix from the view settings</returns>
-	virtual mat4x4 projectionMatrix() const noexcept override;
-
-	/// <summary>
-	/// Calculates the view matrix by applying the transformations in the
-	/// following order: 1. translation, 2. rotation.
-	/// </summary>
-	mat4x4 calculateViewMatrix() const noexcept;
-
-	/// <summary>
-	/// Calculates the projection matrix given by the render parameters
-	/// </summary>
-	mat4x4 calculateProjectionMatrix() const noexcept;
-
-	virtual bool hasViewMatrix() const noexcept override;
-	virtual bool hasProjectionMatrix() const noexcept override;
-
-protected:
-	float nearPlane, farPlane, fov, aspectRatio;
-	vec3 position, rotation;
-};
-
-/// <summary>
-/// Subclass inheriting from Camera3D.
-/// The camera stores its own transformation matrix
-/// that is updated whenever a parameter is changed.
-/// </summary>
-class MatrixBufferedCamera3D : public Camera3D {
-public:
-	/// nearPlane:      The camera's near plane
-	/// farPlane:       The camera's far plane
-	/// fov:            The field of view angle in radians
-	/// aspectRation:   The viewports's aspect ratio
-	/// 
-	
-	/// <summary>
-	/// Creates a buffered camera using the neccessary render settings.
-	/// Position and rotation is set to the default value 0.
-	/// </summary>
-	/// <param name="nearPlane">The camera's near plane</param>
-	/// <param name="farPlane">The camera's far plane</param>
-	/// <param name="fov">The field of view angle in radians</param>
-	/// <param name="aspectRatio">The viewports's aspect ratio</param>
-	MatrixBufferedCamera3D(
-		float nearPlane, float farPlane,
-		float fov, float aspectRatio) noexcept;
-	
-	/// <summary>
-	/// Creates a buffered camera using the neccessary render settings
-	/// with a custom position and rotation.
-	/// </summary>
-	/// <param name="nearPlane">The camera's near plane</param>
-	/// <param name="farPlane">The camera's far plane</param>
-	/// <param name="fov">The field of view angle in radians</param>
-	/// <param name="aspectRatio">The viewport's aspect ratio</param>
-	/// <param name="position">The viewport's aspect ratio</param>
-	/// <param name="rotation">The camera's rotation</param>
-	MatrixBufferedCamera3D(
-		float nearPlane, float farPlane,
-		float fov, float aspectRatio,
-		const glm::vec3& position,
-		const glm::vec3& rotation) noexcept;
-
-	/// nearPlane:      The camera's near plane
-	/// farPlane:       The camera's far plane
-	/// fov:            The field of view angle in radians
-	/// aspectRation:   The viewport's aspect ratio
-	/// roll:           The camera's roll angle. Same as rotation[0]
-	/// pitch:          The camera's pitch angle. Same as rotation[1]
-	/// yaw:            The camera's yaw angle. Same as rotation[2]
- 
-	/// <summary>
-	/// Creates a camera using the neccessary render settings
-	/// with a custom position and rotation.
-	/// </summary>
-	/// <param name="nearPlane">The camera's near plane</param>
-	/// <param name="farPlane">The camera's far plane</param>
-	/// <param name="fov">The field of view angle in radians</param>
-	/// <param name="aspectRatio">The viewport's aspect ratio</param>
-	/// <param name="position">The camera's position</param>
-	/// <param name="roll">The camera's roll angle. Same as rotation[0]</param>
-	/// <param name="pitch">The camera's pitch angle. Same as rotation[1]</param>
-	/// <param name="yaw">The camera's yaw angle. Same as rotation[2]</param>
-	MatrixBufferedCamera3D(
-		float nearPlane, float farPlane,
-		float fov, float aspectRatio,
-		const glm::vec3& position,
-		float roll, float pitch, float yaw) noexcept;
-
-	Camera3D& setNearPlane(float nearPlane) noexcept;
-	Camera3D& setFarPlane(float farPlane) noexcept;
-	Camera3D& setFOV(float fov) noexcept;
-	Camera3D& setAspectRatio(float aspect) noexcept;
-	Camera3D& setAspectRatio(int width, int height) noexcept;
-
-	// Camera3D angles
-	Camera3D& setRoll(float roll) noexcept;
-	Camera3D& setPitch(float pitch) noexcept;
-	Camera3D& setYaw(float yaw) noexcept;
-	Camera3D& changeRoll(float roll) noexcept;
-	Camera3D& changePitch(float pitch) noexcept;
-	Camera3D& changeYaw(float yaw) noexcept;
-	Camera3D& rotate(const glm::vec3& model) noexcept;
-	Camera3D& setRotation(const glm::vec3& rotation) noexcept;
-
-	Camera3D& setX(float x) noexcept;
-	Camera3D& setY(float y) noexcept;
-	Camera3D& setZ(float z) noexcept;
-	Camera3D& move(const glm::vec3& model) noexcept;
-	Camera3D& setPosition(const glm::vec3& position) noexcept;
-
-	mat4x4 viewMatrix() const noexcept override;
-	mat4x4 projectionMatrix() const noexcept override;
-
-	void rebuildProjection() const noexcept;
-	void rebuildView() const noexcept;
-
-	void dirtyProjection(bool value = true) const noexcept;
-	void dirtyView(bool value = true) const noexcept;
-
-	bool isDirtyView() const noexcept;
-	bool isDirtyProjection() const noexcept;
-
-protected:
-	mutable mat4x4 m_viewMatrix = mat4x4(1.0f);
-	mutable mat4x4 m_projectionMatrix = mat4x4(1.0f);
-	mutable bool m_hasViewChange = true;
-	mutable bool m_hasProjectionChange = true;
+	virtual mat4x4 matrix() const noexcept override {
+		mat4x4 mat(1.0f);
+		passthroughCamera3D(mat);
+		return mat;
+	}
+	virtual mat4x4 inverse() const noexcept override {
+		mat4x4 mat(1.0f);
+		passthroughInverseCamera3D(mat);
+		return mat;
+	}
+	virtual void passthrough(mat4x4 &mat) const noexcept override {
+		passthrough(mat);
+	}
+	virtual void passthrough(vec4 &vec) const noexcept override {
+		passthrough(vec);
+	}
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
+		passthrough(mat);
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept override {
+		passthrough(vec);
+	}
 };
 
 //// ---- Camera2D ---- ////
-
-class Camera2D : public Camera {
+template<
+	typename ForwardBuffer = BufferMatrix,
+	typename BackwardBuffer = BufferMatrix>
+class Camera2D :
+	public ViewPipeline,
+	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
 public:
+	using TypeMatrixBuffer = MatrixBuffer<ForwardBuffer, BackwardBuffer>;
+
+	using TypeRotation2D = Rotation2D<CalculateMatrix, CalculateMatrix>;
+	using TypeTranslation2D = Translation2D<CalculateMatrix, CalculateMatrix>;
+	using TypeScale2D = Scale2D<CalculateMatrix, CalculateMatrix>;
+
+protected:
+	TypeRotation2D m_rotation;
+	TypeTranslation2D m_translation;
+	TypeScale2D m_scale;
+	
+	template<typename Type>
+	void passthroughCamera2D(Type &val) {
+		m_scale.passthrough(val); // TODO check
+    	m_rotation.passthrough(val);
+    	m_translation.passthrough(val);
+	}
+	template<typename Type>
+	void passthroughInverseCamera2D(Type &val) {
+		m_translation.passthroughInverse(val); // TODO check
+    	m_rotation.passthroughInverse(val);
+    	m_scale.passthroughInverse(val);
+	}
+
+public:
+	Camera2D() noexcept { }
 	Camera2D(
-		const glm::vec2& position = { 0.0f, 0.0f },
-		float rotation = 0.0f, float zoom=1.0f) noexcept;
+		const TypeTranslation2D translation,
+		const TypeRotation2D rotation,
+		const TypeScale2D scale
+	) noexcept :
+		m_translation(translation),
+		m_rotation(rotation), m_scale(scale) { }
+	
 	virtual ~Camera2D() = default;
 
-	float getX() const noexcept;
-	float getY() const noexcept;
-	float zoom() const noexcept;
-	const glm::vec2& getPosition() const noexcept;
-	float getRotation() const noexcept;
+	// ---- ViewPipeline ---- //
+	virtual mat4x4 projectionMatrix() const noexcept override { return mat4x4(1.0f); }
+	virtual mat4x4 viewMatrix() const noexcept override { return matrix(); }
 
-	void setX(float x) noexcept;
-	void setY(float y) noexcept;
-	void setPosition(float x, float y) noexcept;
-	void setPosition(const glm::vec2& pos) noexcept;
-	void setZoom(float zoom) noexcept;
+	virtual mat4x4 matrix() const noexcept override {
+		mat4x4 mat(1.0f);
+		passthroughCamera2D(mat);
+		return mat;
+	}
 
-	void setRotation(float rotation) noexcept;
+	virtual mat4x4 inverse() const noexcept override {
+		mat4x4 mat(1.0f);
+		passthroughInverseCamera2D(mat);
+		return mat;
+	}
 
-	void move(const glm::vec2& pos) noexcept;
-	void rotate(float rotation) noexcept;
-	void applyZoom(float zoom) noexcept;
-
-	mat4x4 calculateViewMatrix() const noexcept;
-	mat4x4 calculateProjectionMatrix() const noexcept;
-
-	mat4x4 viewMatrix() const noexcept;
-	mat4x4 projectionMatrix() const noexcept;
-
-	virtual bool hasViewMatrix() const noexcept override;
-	virtual bool hasProjectionMatrix() const noexcept override;
-
-protected:
-	float k_rotation, k_zoom;
-	glm::vec2 k_position;
-};
-
-
-class MatrixBufferedCamera2D : public Camera2D {
-public:
-	MatrixBufferedCamera2D(
-		const glm::vec2& position = { 0.0f, 0.0f },
-		float rotation = 0.0f, float zoom=1.0f) noexcept;
-	virtual ~MatrixBufferedCamera2D() = default;
-
-	virtual void setX(float x) noexcept;
-	virtual void setY(float y) noexcept;
-	virtual void setPosition(float x, float y) noexcept;
-	virtual void setPosition(const glm::vec2& pos) noexcept;
-
-	virtual void setRotation(float rotation) noexcept;
-
-	virtual void move(const glm::vec2& pos) noexcept;
-	virtual void rotate(float rotation) noexcept;
-
-	bool isDirty() const noexcept;
-	void dirty(bool value = true) const noexcept;
-	void rebuild() const noexcept;
-
-	virtual mat4x4 viewMatrix() const noexcept;
-	virtual mat4x4 projectionMatrix() const noexcept;
-protected:
-	mutable mat4x4 m_viewMatrix = glm::mat4x4(1.0f);
-	mutable mat4x4 m_projMatrix = glm::mat4x4(1.0f);
-	mutable bool m_dirty = true;
-};
-
-class FreeCamera : public Camera3D {
-public:
-	FreeCamera();
-	virtual ~FreeCamera() = default;
+	virtual void passthrough(mat4x4 &mat) const noexcept {
+		passthroughCamera2D(mat);
+	}
+	virtual void passthrough(vec4 &vec) const noexcept {
+		passthroughCamera2D(vec);
+	}
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept {
+		passthroughInverseCamera2D(mat);
+	}
+	virtual void passthroughInverse(vec4 &vec) const noexcept {
+		passthroughInverseCamera2D(vec);
+	}
 };
 
 NYREM_NAMESPACE_END
-
-#endif // CAMERA_H

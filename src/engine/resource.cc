@@ -99,84 +99,6 @@ std::vector<int> generateIndices(size_t length) {
 	return indices;
 }
 
-
-// ---- PointVertex ---- //
-template<typename Type>
-PointVertexGeneric<Type>::PointVertexGeneric() noexcept
-	: data{ static_cast<Type>(0.0) } { }
-template<typename Type>
-PointVertexGeneric<Type>::PointVertexGeneric(Type px, Type py, Type pz) noexcept
-	: data{ px, py, pz } { }
-
-template struct PointVertexGeneric<float>;
-template struct PointVertexGeneric<double>;
-
-// ---- NormalVertex ---- //
-template<typename Type>
-NormalVertexGeneric<Type>::NormalVertexGeneric() noexcept
-	: data{ static_cast<Type>(0.0) } { }
-template<typename Type>
-NormalVertexGeneric<Type>::NormalVertexGeneric(
-	Type x, Type y, Type z,
-    Type nx, Type ny, Type nz) noexcept
-	: data{x, y, z, nx, ny, nz} { }
-
-template struct NormalVertexGeneric<float>;
-template struct NormalVertexGeneric<double>;
-
-// ---- Vertex ---- //
-
-template<typename Type>
-VertexGeneric<Type>::VertexGeneric() noexcept
-	: data{ static_cast<Type>(0.0) } { }
-
-template<typename Type>
-VertexGeneric<Type>::VertexGeneric(
-	Type px, Type py, Type pz,
-    Type pnx, Type pny, Type pnz,
-    Type ptx, Type pty) noexcept
-	: data{
-		px, py, pz,
-		pnx, pny, pnz,
-		ptx, pty
-	} { }
-
-template struct VertexGeneric<float>;
-template struct VertexGeneric<double>;
-
-// ---- Vertex2D ---- //
-template<typename Type>
-Vertex2DGeneric<Type>::Vertex2DGeneric() noexcept
-	: data{ static_cast<Type>(0.0f) } { }
-
-template<typename Type>
-Vertex2DGeneric<Type>::Vertex2DGeneric(Type x, Type y) noexcept
-	: data{x, y,
-		static_cast<Type>(0.0f),
-		static_cast<Type>(0.0f) } { }
-
-template<typename Type>
-Vertex2DGeneric<Type>::Vertex2DGeneric(Type x, Type y, Type tx, Type ty) noexcept
-	: data{x, y, tx, ty} { }
-
-template struct Vertex2DGeneric<float>;
-template struct Vertex2DGeneric<double>;
-
-// ---- PointVertex2D ---- //
-template<typename Type>
-PointVertex2DGeneric<Type>::PointVertex2DGeneric() noexcept
-	: data{
-		static_cast<Type>(0.0),
-		static_cast<Type>(0.0) } { }
-
-template<typename Type>
-PointVertex2DGeneric<Type>::PointVertex2DGeneric(Type x, Type y) noexcept
-	: data{ x, y } { }
-
-// Explicit instantiation //
-template struct PointVertex2DGeneric<float>;
-template struct PointVertex2DGeneric<double>;
-
 /////////////////////////////
 //// ---- HeightMap ---- ////
 HeightMap::HeightMap(size_t size) {
@@ -447,6 +369,51 @@ void MeshBuilder2D::addVertex(glm::vec2 vertex) { vertices.push_back(vertex); }
 void MeshBuilder2D::addTextureCoord(glm::vec2 vertex) { texCoords.push_back(vertex); }
 void MeshBuilder2D::addColor(glm::vec3 color) { colors.push_back(color); }
 
+MeshBuilder2D& MeshBuilder2D::addMesh(const MeshBuilder2D &mesh) noexcept
+{
+	// appends the mesh data
+	addVertices(mesh.getVertices().begin(), mesh.getVertices().end());
+	addTextureCoords(mesh.getTextureCoords().begin(), mesh.getTextureCoords().end());
+	addColors(mesh.getColors().begin(), mesh.getColors().end());
+
+	size_t vSize = v_indices.size();
+	size_t vcSize = vc_indices.size();
+	size_t vtSize = vt_indices.size();
+	// reserves the necessary space for the indices
+	v_indices.reserve(v_indices.size() + mesh.getV_indices().size());
+	vc_indices.reserve(vc_indices.size() + mesh.getVc_indices().size());
+	vt_indices.reserve(vt_indices.size() + mesh.getVt_indices().size());
+
+	for (IndexType idx : mesh.getV_indices())
+		v_indices.push_back(vSize + idx);
+	for (IndexType idx : mesh.getVc_indices())
+		vc_indices.push_back(vcSize + idx);
+	for (IndexType idx : mesh.getVt_indices())
+		vt_indices.push_back(vtSize + idx);
+	return *this;
+}
+
+//MeshBuilder2D& MeshBuilder2D::addCircle(size_t pcount, float radius, bool strip=false)
+//{
+//	float angleDiff = 2 * 3.141592653589793238f / static_cast<float>(pcount);
+//	if (strip) {
+//		vertices.push_back()
+//		for (size_t i = 0; i < pcount; i++) {
+//			float angle = angleDiff * static_cast<float>(i);
+//			vertices.push_back({
+//				radius * cosf(angle),
+//				radius * sinf(angle) 
+//			});
+//		}
+//		return *this;
+//	} else {
+//	}
+//}
+MeshBuilder2D& MeshBuilder2D::addRect(float x, float y, float width, float height)
+{
+	return *this;
+}
+
 struct PolygonStorage {
 protected:
 	std::vector<const std::vector<vec2>*> m_data;
@@ -454,6 +421,7 @@ public:
 	PolygonStorage(const std::vector<vec2> &begin,
 		const std::vector<std::vector<vec2>> &holes = {}) noexcept {
 		add(begin);
+		std::tuple
 		addAll(holes);
 	}
 
@@ -522,6 +490,14 @@ void MeshBuilder2D::generateDefaultIndices()
 	vc_indices = generateIndices(colors.size());
 }
 
+void MeshBuilder2D::generateNormals(bool indexed) {
+	if (indexed) {
+
+	} else {
+		// TODO
+	}
+}
+
 void MeshBuilder2D::setVIndices(const std::vector<int> &pv_indices) { this->v_indices = pv_indices; }
 void MeshBuilder2D::setVTIndices(const std::vector<int> &pvt_indices) { this->vt_indices = pvt_indices; }
 
@@ -532,27 +508,9 @@ const std::vector<glm::vec2>& MeshBuilder2D::getVertices() const { return vertic
 const std::vector<glm::vec2>& MeshBuilder2D::getTextureCoords() const { return texCoords; }
 const std::vector<glm::vec3>& MeshBuilder2D::getColors() const { return colors; }
 const std::vector<int>& MeshBuilder2D::getV_indices() const { return v_indices; }
+const std::vector<int>& MeshBuilder2D::getVc_indices() const { return vc_indices; }
 const std::vector<int>& MeshBuilder2D::getVt_indices() const { return vt_indices; }
 
-std::vector<Vertex2D> MeshBuilder2D::toVertexArray(float scaleModif) {
-	std::vector<Vertex2D> vertexData(vertices.size());
-	for (size_t i = 0; i < vertices.size(); i++) {
-		vertexData[i] = Vertex2D(
-			vertices[i].x * scaleModif,
-			vertices[i].y * scaleModif,
-			texCoords[i].x, texCoords[i].y);
-	}
-	return vertexData;
-}
-
-// TODO what does this function do?
-std::vector<Vertex2D> MeshBuilder2D::toVertexArrayIndexed(float scaleModif) {
-	std::vector<Vertex2D> vertexData(vertices.size());
-	//for (size_t i = 0; i < vertices.size(); i++) {
-	//	vertexData[i] = vertices[i] * scaleModif;
-	//}
-	return vertexData;
-}
 
 std::string MeshBuilder2D::info() {
 	return fmt::format("MeshBuilder2D Object\n"
@@ -648,6 +606,10 @@ ExportFile MeshBuilderBase::exportData() const
 	return expFile;
 }
 
+size_t MeshBuilderBase::size() const noexcept {
+	return exp.size();
+}
+
 MeshBuilder::MeshBuilder() { }
 MeshBuilder::MeshBuilder(
     const std::vector<glm::vec3> &pVertices,
@@ -699,98 +661,6 @@ void MeshBuilder::scale(float scale) {
 }
 void MeshBuilder::unitize(float unitScale) {
 	scale(unitScale / maxExtent());
-}
-
-std::vector<Vertex> MeshBuilder::toVertexArray() {
-	float scaleModif = 1.0f;
-	std::vector<Vertex> vertexData(vertices.size());
-	for (size_t i = 0; i < vertices.size(); i++) {
-		vertexData[i] = Vertex(
-			vertices[i].x * scaleModif,
-			vertices[i].y * scaleModif,
-			vertices[i].z * scaleModif,
-			normals[i].x,
-			normals[i].y,
-			normals[i].z,
-			texcoords[i].x,
-			texcoords[i].y
-		);
-	}
-	return vertexData;
-}
-std::vector<PointVertex> MeshBuilder::toPointVertexArray() {
-	float scaleModif = 1.0f;
-	std::vector<PointVertex> vertexData(vertices.size());
-	for (size_t i = 0; i < vertices.size(); i++) {
-		vertexData[i] = PointVertex(
-			vertices[i].x * scaleModif,
-			vertices[i].y * scaleModif,
-			vertices[i].z * scaleModif
-		);
-	}
-	return vertexData;
-}
-std::vector<NormalVertex> MeshBuilder::toNormalVertexArray() {
-	float scaleModif = 1.0f;
-	std::vector<NormalVertex> vertexData(vertices.size());
-	for (size_t i = 0; i < vertices.size(); i++) {
-		vertexData[i] = NormalVertex(
-			vertices[i].x * scaleModif,
-			vertices[i].y * scaleModif,
-			vertices[i].z * scaleModif,
-			normals[i].x,
-			normals[i].y,
-			normals[i].z
-		);
-	}
-	return vertexData;
-}
-
-std::vector<Vertex> MeshBuilder::toVertexArrayIndexed() {
-	float scaleModif = 1.0;
-    std::vector<Vertex> vertexData(v_indices.size());
-    for (size_t i = 0; i < v_indices.size(); i++) {
-        vertexData[i] = Vertex(
-            vertices[v_indices[i]-1].x * scaleModif,
-            vertices[v_indices[i]-1].y * scaleModif,
-            vertices[v_indices[i]-1].z * scaleModif,
-            normals[vn_indices[i]-1].x,
-			normals[vn_indices[i]-1].y,
-			normals[vn_indices[i]-1].z,
-            texcoords[vt_indices[i]-1].x,
-			texcoords[vt_indices[i]-1].y
-		);
-    }
-	return vertexData;
-}
-
-
-std::vector<PointVertex> MeshBuilder::toPointVertexArrayIndexed() {
-	float scaleModif = 1.0;
-	std::vector<PointVertex> vertexData(v_indices.size());
-	for (size_t i = 0; i < v_indices.size(); i++) {
-		vertexData[i] = PointVertex(
-			vertices[v_indices[i]-1].x * scaleModif,
-			vertices[v_indices[i]-1].y * scaleModif,
-			vertices[v_indices[i]-1].z * scaleModif
-		);
-	}
-	return vertexData;
-}
-std::vector<NormalVertex> MeshBuilder::toNormalVertexArrayIndexed() {
-	float scaleModif = 1.0;
-	std::vector<NormalVertex> vertexData(vertices.size());
-	for (size_t i = 0; i < vertices.size(); i++) {
-		vertexData[i] = NormalVertex(
-            vertices[v_indices[i]-1].x * scaleModif,
-            vertices[v_indices[i]-1].y * scaleModif,
-            vertices[v_indices[i]-1].z * scaleModif,
-            normals[vn_indices[i]-1].x,
-			normals[vn_indices[i]-1].y,
-			normals[vn_indices[i]-1].z
-		);
-	}
-	return vertexData;
 }
 
 Indice::Indice(int pv, int pt, int pn) {
@@ -889,6 +759,45 @@ void MeshBuilder::setVNIndices(const std::vector<int> &pIndices) { this->vn_indi
 void MeshBuilder::setVTIndices(const std::vector<int> &pIndices) { this->vt_indices = pIndices; }
 void MeshBuilder::setVCIndices(const std::vector<int> &indices) { this->vc_indices = indices; }
 
+void MeshBuilder::generateNormals(bool indexed, bool side) noexcept
+{
+	normals.clear();
+	vn_indices.clear();
+	if (indexed) {
+		normals.reserve(v_indices.size());
+		for (size_t i = 0; i + 3 <= v_indices.size();) {
+			Triangle3D<float> tri(
+				vertices[v_indices[i + 0]],
+				vertices[v_indices[i + 1]],
+				vertices[v_indices[i + 2]]);
+			vec3 normal = side ? tri.normal() : tri.inverseNormal();
+			normals.push_back(normal);
+			vn_indices.push_back(static_cast<IndexType>(i));
+			vn_indices.push_back(static_cast<IndexType>(i));
+			vn_indices.push_back(static_cast<IndexType>(i));
+		}
+	} else {
+		normals.clear();
+		normals.reserve(vertices.size());
+		for (size_t i = 0; i + 3 <= normals.size(); i += 3) {
+			Triangle3D<float> tri(
+				vertices[i + 0],
+				vertices[i + 1],
+				vertices[i + 2]);
+			vec3 normal = side ? tri.normal() : tri.inverseNormal();
+
+			normals.push_back(normal);
+			normals.push_back(normal);
+			normals.push_back(normal);
+			vn_indices.push_back(i);
+			vn_indices.push_back(i + 1);
+			vn_indices.push_back(i + 2);
+		}
+		// generates the default indices
+		vn_indices = generateIndices(normals.size());
+	}
+}
+
 void MeshBuilder::generateDefaultIndices()
 {
 	v_indices = generateIndices(vertices.size());
@@ -951,6 +860,7 @@ MeshBuilder MeshBuilder::fromOBJ(const std::string &filename, const std::string 
 
 MeshBuilder nyrem::loadCube() {
 	MeshBuilder mesh;
+	float x = 1.0f, y = 1.0f, z = 1.0f;
 	mesh.vertices = {
 		{-1.0f,-1.0f,-1.0f}, {-1.0f,-1.0f, 1.0f}, {-1.0f, 1.0f, 1.0f},
 		{ 1.0f, 1.0f,-1.0f}, {-1.0f,-1.0f,-1.0f}, {-1.0f, 1.0f,-1.0f},
@@ -1033,35 +943,6 @@ bool MeshBuilder2D::Exporter2D::resolveTypes(std::vector<float> &data, size_t i)
 		}
 	}
 	return true;
-}
-
-Triangle::Triangle() :
-	k_v1(-1.0f, -1.0f, -1.0f),
-	k_v2(1.0f, 1.0f, 1.0f),
-	k_v3(-1.0f, 1.0f, 1.0f)
-{ }
-
-Triangle::Triangle(const glm::vec3 v1,
-	const glm::vec3 v2, const glm::vec3 v3)
-	: k_v1(v1), k_v2(v2), k_v3(v3) { }
-
-glm::vec3& Triangle::v1() { return k_v1; }
-glm::vec3& Triangle::v2() { return k_v2; }
-glm::vec3& Triangle::v3() { return k_v3; }
-const glm::vec3& Triangle::v1() const { return k_v1; }
-const glm::vec3& Triangle::v2() const { return k_v2; }
-const glm::vec3& Triangle::v3() const { return k_v3; }
-
-glm::vec3 Triangle::center() const {
-	return {
-		(k_v1.x + k_v2.x + k_v3.x) / 3.0f,
-		(k_v1.y + k_v2.y + k_v3.y) / 3.0f,
-		(k_v1.z + k_v2.z + k_v3.z) / 3.0f
-	};
-}
-float Triangle::area() const { return 1.0f; }
-glm::vec3 Triangle::normal() const {
-	return glm::cross(k_v3 - k_v1, k_v2 - k_v1);
 }
 
 

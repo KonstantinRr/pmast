@@ -193,6 +193,29 @@ int main(int argc, char** argv)
 		}
 	});
 
+	struct A {
+		void a() { }
+	};
+
+	struct B {
+		void a() { }
+		void b() { }
+
+	};
+
+	struct C : public A, B {
+
+	};
+	C a;
+	a.b();
+
+	// 2, 2, 3, 3 1
+	GenericVertex<float,
+		VertexComponent2D, TextureComponent2D,
+		VertexComponent3D, NormalComponent3D> x;
+	
+	bool v = x.hasType<VertexComponent2D>();
+	std::cout << sizeof(x) << " " << v << " " << "HELLO" << std::endl;
 
     eng.setPipeline(m_canvas.get());
     eng.mainloop();

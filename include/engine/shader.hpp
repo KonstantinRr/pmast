@@ -379,12 +379,12 @@ public:
 // ---- RectShader ---- //
 struct RectStageBuffer {
 	RenderList<TransformableEntity2D> renderList;
-	std::shared_ptr<const Camera> camera;
+	std::shared_ptr<const ViewTransformer> camera;
 
 	explicit RectStageBuffer() = default;
 	explicit RectStageBuffer(
 		const RenderList<TransformableEntity2D>& list,
-		const std::shared_ptr<const Camera> &camera);
+		const std::shared_ptr<const ViewTransformer> &camera);
 };
 
 
@@ -407,7 +407,7 @@ public:
 
 	void render(
 		const RenderList<TransformableEntity2D>& renderList,
-		const std::shared_ptr<const Camera> &camera);
+		const std::shared_ptr<const ViewTransformer> &camera);
 	void render(const RectStageBuffer& stageBuffer);
 
 	void loadTransform(const glm::mat4x4& matrix);
@@ -428,12 +428,12 @@ public:
 
 //// ---- SimpleMVPShader ---- ////
 struct MVPListStageBuffer {
-	std::shared_ptr<Camera> camera;
+	std::shared_ptr<ViewTransformer> camera;
 	std::shared_ptr<RenderList<Entity>> list;
 
 	explicit MVPListStageBuffer();
 	explicit MVPListStageBuffer(
-		const std::shared_ptr<Camera>& camera,
+		const std::shared_ptr<ViewTransformer>& camera,
 		const std::shared_ptr<RenderList<Entity>>& list);
 };
 
@@ -450,7 +450,7 @@ public:
 	SimpleMVPShader& operator=(const SimpleMVPShader&) = delete;
 	SimpleMVPShader& operator=(SimpleMVPShader &&sh);
 
-	void render(const Camera& camera, const RenderList<Entity>& list);
+	void render(const ViewTransformer& camera, const RenderList<Entity>& list);
 	void render(const MVPListStageBuffer& stageBuffer);
 
 	virtual void initializeUniforms();
@@ -467,27 +467,27 @@ public:
 //// ---- PhongShader ---- ////
 
 struct PhongListStageBuffer {
-	std::shared_ptr<Camera> camera;
+	std::shared_ptr<ViewPipeline> camera;
 	std::shared_ptr<RenderList<Entity>> renderList;
 	glm::vec3 lightPosition;
 	glm::vec3 lightColor;
 
 	explicit PhongListStageBuffer();
 	explicit PhongListStageBuffer(
-		const std::shared_ptr<Camera>& camera,
+		const std::shared_ptr<ViewPipeline>& camera,
 		const std::shared_ptr<RenderList<Entity>>& renderList,
 		const glm::vec3& lightPosition, const glm::vec3& lightColor);
 };
 
 struct PhongBatchStageBuffer {
-	std::shared_ptr<Camera> camera;
+	std::shared_ptr<ViewPipeline> camera;
 	std::shared_ptr<RenderBatch<Entity>> renderList;
 	glm::vec3 lightPosition;
 	glm::vec3 lightColor;
 
 	explicit PhongBatchStageBuffer();
 	explicit PhongBatchStageBuffer(
-		const std::shared_ptr<Camera>& camera,
+		const std::shared_ptr<ViewPipeline>& camera,
 		const std::shared_ptr<RenderBatch<Entity>>& renderList,
 		const glm::vec3& lightPosition, const glm::vec3& lightColor);
 };
@@ -516,11 +516,11 @@ public:
 	PhongShader& operator=(PhongShader &&sh);
 
 	// Inherited from ShaderBase
-	virtual void initializeUniforms();
+	virtual void initializeUniforms() override;
 
-	void render(const Camera& camera, const RenderList<Entity>& list,
+	void render(const ViewPipeline& camera, const RenderList<Entity>& list,
 		const glm::vec3& lightPosition, const glm::vec3& lightColor);
-	void render(const Camera& camera, const RenderBatch<Entity>& batch,
+	void render(const ViewPipeline& camera, const RenderBatch<Entity>& batch,
 		const glm::vec3& lightPosition, const glm::vec3& lightColor);
 	void render(const PhongListStageBuffer& stageBuffer);
 	void render(const PhongBatchStageBuffer& stageBuffer);

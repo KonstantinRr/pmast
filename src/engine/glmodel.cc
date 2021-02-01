@@ -68,65 +68,6 @@ GLModel::GLModel(const ExportFile& file)
     CGL(glBindVertexArray(0));
 }
 
-GLModel::GLModel(const std::vector<Vertex2D> &vertices) {
-    modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = 0;
-    type = ModelType::VERTEX2D;
-    generateVAO();
-    generateVBOVertexArray2D(vertices);
-}
-
-GLModel::GLModel(const std::vector<Vertex> &vertices) {
-	modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = 0;
-    type = ModelType::VERTEX;
-    generateVAO();
-    generateVBOVertexArray(vertices);
-}
-
-GLModel::GLModel(const std::vector<PointVertex> &vertices) {
-	modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = 0;
-    type = ModelType::POINT_VERTEX;
-    generateVAO();
-    generateVBOPointVertexArray(vertices);
-}
-
-GLModel::GLModel(const std::vector<NormalVertex> &vertices) {
-	modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = 0;
-    type = ModelType::NORMAL_VERTEX;
-	generateVAO();
-    generateVBONormalVertexArray(vertices);
-}
-
-GLModel::GLModel(const std::vector<Vertex> &vertices, const std::vector<size_t> &index) {
-    modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = static_cast<GLsizei>(index.size());
-    type = ModelType::VERTEX_INDEXED;
-    generateVAO();
-    generateVIO(index);
-    generateVBOVertexArray(vertices);
-}
-
-GLModel::GLModel(const std::vector<PointVertex> &vertices, const std::vector<size_t> &index) {
-    modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = static_cast<GLsizei>(index.size());
-    type = ModelType::POINT_VERTEX_INDEXED;
-    generateVAO();
-    generateVIO(index);
-    generateVBOPointVertexArray(vertices);
-}
-GLModel::GLModel(const std::vector<NormalVertex> &vertices, const std::vector<size_t> &index) {
-    modelSize = static_cast<GLsizei>(vertices.size());
-    indexSize = static_cast<GLsizei>(index.size());
-    type = ModelType::NORMAL_VERTEX_INDEXED;
-    generateVAO();
-    generateVIO(index);
-    generateVBONormalVertexArray(vertices);
-}
-
-
 void GLModel::generateVAO() {
     CGL(glGenVertexArrays(1, &vao));
     CGL(glBindVertexArray(vao));
@@ -137,58 +78,6 @@ void GLModel::generateVIO(const std::vector<size_t> &index) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vio);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, index.size() * 2, index.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-}
-
-void GLModel::generateVBOVertexArray2D(const std::vector<Vertex2D> &vertices) {
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex2D) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex2D), 0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex2D), (void*) (sizeof(float) * 2));
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void GLModel::generateVBOVertexArray(const std::vector<Vertex> &vertices) {
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
-	
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) (sizeof(float) * 3));
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) (sizeof(float) * 6));
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void GLModel::generateVBOPointVertexArray(const std::vector<PointVertex> &vertices) {
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(PointVertex) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void GLModel::generateVBONormalVertexArray(const std::vector<NormalVertex> &vertices) {
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(NormalVertex) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), 0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*) (sizeof(float) * 3));
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void GLModel::bind() {

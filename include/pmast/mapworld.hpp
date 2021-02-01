@@ -50,6 +50,10 @@ public:
 
 protected:
     nyrem::RenderPipeline m_pipeline;
+
+    std::shared_ptr<nyrem::Camera3D<>> m_camera;
+    std::shared_ptr<nyrem::PhongShader> m_shader;
+    std::shared_ptr<nyrem::PhongListStage> m_shader_stage;
 };
 
 

@@ -60,21 +60,8 @@ public:
     GLModel(GLsizei modelSize, GLuint vao, GLuint vbo);
     GLModel(const ExportFile &file);
 
-    GLModel(const std::vector<Vertex2D> &vertices);
-    GLModel(const std::vector<Vertex> &vertices);
-    GLModel(const std::vector<PointVertex> &vertices);
-    GLModel(const std::vector<NormalVertex> &vertices);
-
-    GLModel(const std::vector<Vertex> &vertices, const std::vector<size_t> &index);
-    GLModel(const std::vector<PointVertex> &vertices, const std::vector<size_t> &index);
-    GLModel(const std::vector<NormalVertex> &vertices, const std::vector<size_t> &index);
-
     void generateVAO();
     void generateVIO(const std::vector<size_t> &index);
-    void generateVBOVertexArray2D(const std::vector<Vertex2D> &vertices);
-    void generateVBOVertexArray(const std::vector<Vertex> &vertices);
-    void generateVBOPointVertexArray(const std::vector<PointVertex> &vertices);
-    void generateVBONormalVertexArray(const std::vector<NormalVertex> &vertices);
 
     void cleanUp();
     void bind();

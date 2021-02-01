@@ -318,9 +318,10 @@ glm::mat4 MapCanvas::transformPlaneToView4DGLM() const {
 	return mat;
 }
 
-nyrem::Camera MapCanvas::asCamera() const noexcept
+std::shared_ptr<nyrem::ViewTransformer> MapCanvas::asCamera() const noexcept
 {
-	return nyrem::TransformedCamera(transformPlaneToView4DGLM(), nyrem::mat4x4(1.0f));
+	return std::make_shared<nyrem::ViewTransformer>(
+		nyrem::TransformedCamera<>(transformPlaneToView4DGLM()));
 }
 
 void MapCanvas::render(const nyrem::RenderContext &context)
@@ -347,8 +348,8 @@ void MapCanvas::render(const nyrem::RenderContext &context)
 		// adds all agents
 		if (m_agentList != nullptr) {
 			rect_comp->stageBuffer().renderList.clear();
-			rect_comp->stageBuffer().camera = std::make_shared<nyrem::TransformedCamera>(
-				transform, nyrem::mat4x4(1.0f));
+			rect_comp->stageBuffer().camera = std::make_shared<
+				nyrem::TransformedCamera<>>(transform);
 			for (const Agent &agent : *m_agentList) {
 				//auto a = std::make_shared<nyrem::TransformableEntity2D>(nyrem::TransformableEntity2D(1,
 				//	nullptr, nullptr, { nyrem::vec3{0.0f, 1.0f, 0.0f} },

@@ -31,6 +31,9 @@
 #include <engine/internal.hpp>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/matrix_transform_2d.hpp>
+#include <glm/gtx/norm.hpp>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -39,133 +42,389 @@
 
 NYREM_NAMESPACE_BEGIN
 
-/// <summary> class PointVertex2D
-/// This data struct stores 2 dimensional vertex
-/// data in the following layout:
-/// float32/float64 x, float32/float64 y
-/// </summary>
-template<typename Type>
-struct PointVertex2DGeneric {
-    static constexpr size_t
-        INDEX_X = 0, INDEX_Y = 1;
-    Type data[2];
+namespace detail {
+    // Some dark template magic is happening in here...
+    // WARNING:: It is better if you don't take a look
+    // unless you are a master of the dark arkane forces.
+    template<typename T> struct identity { typedef T type; };
+    template<size_t Index> struct index { };
 
-    PointVertex2DGeneric() noexcept;
-    PointVertex2DGeneric(Type x, Type y) noexcept;
+    template<size_t Size, typename Type,
+        template<size_t, class> typename VertexType,
+        template<size_t, class> typename... Args>
+    struct DefaultComponent :
+        public DefaultComponent<Size + 0, Type, VertexType>,
+        public DefaultComponent<Size + 1, Type, Args...>
+    {
+        using ParentData = DefaultComponent<Size + 0, Type, VertexType>;
+        using ParentRecursion = DefaultComponent<Size + 1, Type, Args...>;
 
-    inline Type x() const noexcept { return data[INDEX_X]; }
-    inline Type y() const noexcept { return data[INDEX_Y]; }
+        template<template<size_t, class> typename CheckType>
+        bool hasTypeImpl() const {
+            return DefaultComponent<Size + 0, Type, VertexType>::hasTypeImpl<CheckType>() ||
+                ParentRecursion::hasTypeImpl<CheckType>();
+        }
+    };
+
+    template<size_t Size, typename Type,
+        template<size_t, class> typename VertexType>
+    struct DefaultComponent<Size, Type, VertexType> :
+        public VertexType<Size, Type>
+    {
+        template<template<size_t, class> typename CheckType>
+        bool hasTypeImpl() const {
+            return std::is_same<VertexType<Size, Type>, CheckType<Size, Type>>::value;
+        }
+
+        // Index Getters //
+        inline VertexType<Size, Type>& getter(index<Size>) noexcept {
+            return *static_cast<VertexType<Size, Type>*>(this);
+        }
+        inline const VertexType<Size, Type>& getter(index<Size>) const noexcept {
+            return *static_cast<const VertexType<Size, Type>*>(this);
+        }
+        // Type Getters //
+        inline VertexType<Size, Type>& getter(identity<VertexType<Size, Type>>) noexcept {
+            return *static_cast<VertexType<Size, Type>*>(this);
+        }
+        inline const VertexType<Size, Type>& getter(identity<VertexType<Size, Type>>) const noexcept {
+            return *static_cast<const VertexType<Size, Type>*>(this);
+        }
+    };
+}
+
+template<typename Type> class Spacer1{ Type data[1]; };
+template<typename Type> class Spacer2{ Type data[2]; };
+template<typename Type> class Spacer3{ Type data[3]; };
+template<typename Type> class Spacer4{ Type data[4]; };
+
+struct BaseComponent {
+    inline void notImplemented(const char *result) {
+        //throw std::runtime_error("BaseComponent: Not Implemented"s + result);
+    }
+
+    constexpr bool hasV2() const noexcept { return false; }
+    constexpr bool hasV3() const noexcept { return false; }
+    constexpr bool hasN2() const noexcept { return false; }
+    constexpr bool hasN3() const noexcept { return false; }
+    constexpr bool hasT2() const noexcept { return false; }
+    constexpr bool hasT3() const noexcept { return false; }
+
+    inline void setV2(vec2 vec) { notImplemented("V2"); }
+    inline void setV3(vec3 vec) { notImplemented("V3"); }
+    inline void setN2(vec2 vec) { notImplemented("N2"); }
+    inline void setN3(vec3 vec) { notImplemented("N3"); }
+    inline void setTX2(vec2 vec) { notImplemented("TX2"); }
+    inline void setTX3(vec3 vec) { notImplemented("TX3"); }
 };
 
-using FloatPointVertex2D = PointVertex2DGeneric<float>;
-using DoublePointVertex2D = PointVertex2DGeneric<double>;
-using PointVertex2D = FloatPointVertex2D;
+template<typename Type, template<size_t, class> typename... Args>
+struct GenericVertex :
+    public detail::DefaultComponent<0, Type, Args...>
+{
+    //template<typename PType>
+    //constexpr bool hasTypeImpl(detail::identity<PType>) const noexcept { return false; }
 
-/// <summary> class Vertex2D
-/// This data struct stores 2 dimensional vertex
-/// and texture data in the following layout:
-/// float32/float64 x, float32/float64 y
-/// float32/float64 tx, float32/float64 ty
-/// </summary>
-template<typename Type>
-struct Vertex2DGeneric {
-    static constexpr size_t
-        INDEX_X = 0, INDEX_Y = 1,
-        INDEX_TX = 2, INDEX_TY = 3;
-    Type data[4];
+    template<template<size_t, class> typename CheckType>
+    bool hasType() const {
+        return detail::DefaultComponent<0, Type, Args...>
+            ::hasTypeImpl<CheckType>();
+    }
 
-    Vertex2DGeneric() noexcept;
-    explicit Vertex2DGeneric(Type x, Type y) noexcept;
-    explicit Vertex2DGeneric(Type x, Type y, Type tx, Type ty) noexcept;
-
-    inline Type x() const noexcept { return data[INDEX_X]; }
-    inline Type y() const noexcept { return data[INDEX_Y]; }
-    inline Type tx() const noexcept { return data[INDEX_TX]; }
-    inline Type ty() const noexcept { return data[INDEX_TY]; }
+    // Type getters
+    template<typename GetType>
+    inline GetType& get() noexcept { return getter(detail::identity<GetType>()); }
+    template<typename GetType>
+    inline const GetType& get() const noexcept { return getter(detail::identity<GetType>()); }
+    // Index getters
+    template<size_t Index>
+    inline auto& get() noexcept { return getter(detail::index<Index>()); }
+    template<size_t Index>
+    inline const auto& get() const noexcept { return getter(detail::index<Index>()); }
 };
 
-using FloatVertex2D = Vertex2DGeneric<float>;
-using DoubleVertex2D = Vertex2DGeneric<double>;
-using Vertex2D = FloatVertex2D;
+// definition of components //
 
-/// <summary> class Point Vertex
-/// This data struct stores 3 dimensional vertex
-/// data in the following layout:
-/// float32 x, float32 y, float32 z
-/// </summary>
-template<typename Type>
-struct PointVertexGeneric {
-    static constexpr size_t
-        INDEX_X = 0, INDEX_Y = 1, INDEX_Z = 2;
-    Type data[3];
+template<size_t Size, typename Type>
+struct VertexComponent2D : public BaseComponent {
+    static constexpr size_t INDEX_X2 = 0, INDEX_Y2 = 1;
+    Type dataV2[2];
 
-    PointVertexGeneric() noexcept;
-    PointVertexGeneric(Type x, Type y, Type z) noexcept;
+    constexpr bool hasV2() const noexcept { return true; }
 
-    inline Type x() const noexcept { return data[INDEX_X]; }
-    inline Type y() const noexcept { return data[INDEX_Y]; }
-    inline Type z() const noexcept { return data[INDEX_Z]; }
+    VertexComponent2D() noexcept :
+        dataV2{
+            static_cast<Type>(0.0),
+            static_cast<Type>(0.0)
+        } { }
+    VertexComponent2D(vec2 vec) noexcept :
+        dataV2{ vec.x, vec.y } { }
+    explicit VertexComponent2D(Type x, Type y) noexcept :
+        dataV2{ x, y } { }
+
+    inline vec2 asVecV2() const noexcept {
+        return vec2(dataV2[INDEX_X2], dataV2[INDEX_Y2]);
+    }
+
+    inline void setV2(vec2 vec) noexcept {
+        dataV2[INDEX_X2] = vec.x;
+        dataV2[INDEX_Y2] = vec.y;
+    }
+
+    inline vec2 get() const noexcept { return asVecV2(); }
+    inline void set(vec2 vec) noexcept { setV2(vec); }
+
+    inline void setX2(Type x) const noexcept { dataV2[INDEX_X2] = x; }
+    inline void setY2(Type y) const noexcept { dataV2[INDEX_Y2] = y; }
+
+    inline Type x2() const noexcept { return dataV2[INDEX_X2]; }
+    inline Type y2() const noexcept { return dataV2[INDEX_Y2]; }
 };
 
-using FloatPointVertex = PointVertexGeneric<float>;
-using DoublePointVertex = PointVertexGeneric<double>;
-using PointVertex = FloatPointVertex;
+using VertexComponent2DFloat = VertexComponent2D<0, float>;
+using VertexComponent2DDouble = VertexComponent2D<0, double>;
+using VertexComponent2DDefault = VertexComponent2DFloat;
 
-/// <summary> class NormalVertex
-/// This data struct stores 3 dimensional vertex,
-/// and normal data in the following layout:
-/// float32 x, float32 y, float32 z
-/// float32 nx, float32 ny, float32 nz
-/// </summary>
-template<typename Type>
-struct NormalVertexGeneric {
-    static constexpr size_t
-        INDEX_X = 0, INDEX_Y = 1, INDEX_Z = 2,
-        INDEX_NX = 3, INDEX_NY = 4, INDEX_NZ = 5;
-    Type data[6];
+template<size_t Size, typename Type>
+struct TextureComponent2D : public BaseComponent {
+    static constexpr size_t INDEX_TX2 = 0, INDEX_TY2 = 1;
+    Type dataT2[2];
 
-    NormalVertexGeneric() noexcept;
-    NormalVertexGeneric(
-        Type x, Type y, Type z,
-        Type nx, Type ny, Type nz) noexcept;
+    TextureComponent2D() noexcept :
+        dataT2 {
+            static_cast<Type>(0),
+            static_cast<Type>(0)
+        } { }
+    TextureComponent2D(vec2 vec) noexcept :
+        dataT2{ vec.x, vec.y } { }
+    explicit TextureComponent2D(Type tx, Type ty) noexcept :
+        dataT2{ tx, ty } { }
 
-    inline Type x() const noexcept { return data[INDEX_X]; }
-    inline Type y() const noexcept { return data[INDEX_Y]; }
-    inline Type z() const noexcept { return data[INDEX_Z]; }
-    inline Type nx() const noexcept { return data[INDEX_NX]; }
-    inline Type ny() const noexcept { return data[INDEX_NY]; }
-    inline Type nz() const noexcept { return data[INDEX_NZ]; }
+    inline vec2 asVecT2() const noexcept {
+        return vec2(dataT2[INDEX_TX2], dataT2[INDEX_TY2]);
+    }
+
+    inline void setT2(vec2 vec) noexcept {
+        dataT2[INDEX_TX2] = vec.x;
+        dataT2[INDEX_TY2] = vec.y;
+    }
+
+    void setTX2(Type tx) const noexcept { dataT2[INDEX_TX2] = tx; }
+    void setTY2(Type ty) const noexcept { dataT2[INDEX_TY2] = ty; }
+    
+    inline Type tx2() const noexcept { return dataT2[INDEX_TX2]; }
+    inline Type ty2() const noexcept { return dataT2[INDEX_TY2]; }
 };
 
-using FloatNormalVertex = NormalVertexGeneric<float>;
-using DoubleNormalVertex = NormalVertexGeneric<double>;
-using NormalVertex = FloatNormalVertex;
+using TextureComponent2DFloat = TextureComponent2D<0, float>;
+using TextureComponent2DDouble = TextureComponent2D<0, double>;
+using TextureComponent2DDefault = TextureComponent2DFloat;
 
-/// <summary> class NormalVertex
-/// This data struct stores 3 dimensional vertex,
-/// normal and texture data in the following layout:
-/// float32 x, float32 y, float32 z
-/// float32 nx, float32 ny, float32 nz
-/// float32 tx, float32 ty
-/// </summary>
-template<typename Type>
-struct VertexGeneric {
+template<size_t Size, typename Type>
+struct VertexComponent3D : public BaseComponent {
     static constexpr size_t
-        INDEX_X = 0, INDEX_Y = 1, INDEX_Z = 2,
-        INDEX_NX = 3, INDEX_NY = 4, INDEX_NZ = 5;
-    Type data[8];
-        
-    // Constructors
-    VertexGeneric() noexcept;
-    VertexGeneric(
-        Type x, Type y, Type z,
-        Type nx, Type ny, Type nz,
-        Type tx1, Type ty1) noexcept;
+        INDEX_X3 = 0, INDEX_Y3 = 1, INDEX_Z3 = 2;
+    Type dataV3[3];
+
+    VertexComponent3D() noexcept :
+        dataV3{
+            static_cast<Type>(0),
+            static_cast<Type>(0),
+            static_cast<Type>(0)
+        } { }
+    VertexComponent3D(vec3 vec) noexcept :
+        dataV3{ vec.x, vec.y, vec.z } { }
+    explicit VertexComponent3D(Type x, Type y, Type z) noexcept :
+        dataV3{ x, y, z} { }
+
+    inline vec3 asVecV3() const noexcept {
+        return vec3(dataV3[INDEX_X3], dataV3[INDEX_Y3], dataV3[INDEX_Z3]);
+    }
+
+    inline void setV3(vec3 vec) noexcept {
+        dataV3[INDEX_X3] = vec.x;
+        dataV3[INDEX_Y3] = vec.y;
+        dataV3[INDEX_Z3] = vec.z;
+    }
+
+    inline void setX3(Type x) noexcept { dataV3[INDEX_X3] = x; }
+    inline void setY3(Type y) noexcept { dataV3[INDEX_Y3] = y; }
+    inline void setZ3(Type z) noexcept { dataV3[INDEX_Z3] = z; }
+
+    inline Type x3() const noexcept { return dataV3[INDEX_X3]; }
+    inline Type y3() const noexcept { return dataV3[INDEX_Y3]; }
+    inline Type z3() const noexcept { return dataV3[INDEX_Z3]; }
 };
 
-using FloatVertex = VertexGeneric<float>;
-using DoubleVertex = VertexGeneric<double>;
-using Vertex = FloatVertex;
+using VertexComponent3DFloat = VertexComponent3D<0, float>;
+using VertexComponent3DDouble = VertexComponent3D<0, double>;
+using VertexComponent3DDefault = VertexComponent3DFloat;
+
+template<size_t Size, typename Type>
+struct NormalComponent3D {
+    static constexpr size_t
+        INDEX_NX3 = 0, INDEX_NY3 = 1, INDEX_NZ3 = 2;
+    Type dataN3[3];
+
+    NormalComponent3D() noexcept :
+        dataN3{
+            static_cast<Type>(0),
+            static_cast<Type>(0),
+            static_cast<Type>(0)
+        } { }
+    NormalComponent3D(vec3 vec) noexcept :
+        dataN3{vec.x, vec.y, vec.z} { }
+    explicit NormalComponent3D(Type nx, Type ny, Type nz) noexcept :
+        dataN3{nx, ny, nz} { }
+
+    inline vec3 asVecN3() const noexcept {
+        return vec3(dataN3[INDEX_NX3], dataN3[INDEX_NY3], dataN3[INDEX_NZ3]);
+    }
+
+    inline void setN3(vec3 n) noexcept {
+        dataN3[INDEX_NX3] = n.x;
+        dataN3[INDEX_NY3] = n.y;
+        dataN3[INDEX_NZ3] = n.z;
+    }
+
+    inline void setNX3(Type val) noexcept { dataN3[INDEX_NX3] = val; }
+    inline void setNY3(Type val) noexcept { dataN3[INDEX_NY3] = val; }
+    inline void setNZ3(Type val) noexcept { dataN3[INDEX_NZ3] = val; }
+
+    inline Type nx() const noexcept { return dataN3[INDEX_NX3]; }
+    inline Type ny() const noexcept { return dataN3[INDEX_NY3]; }
+    inline Type nz() const noexcept { return dataN3[INDEX_NZ3]; }
+};
+
+using NormalComponent3DFloat = NormalComponent3D<0, float>;
+using NormalComponent3DDouble = NormalComponent3D<0, double>;
+using NormalComponent3DDefault = NormalComponent3DFloat;
+
+using IndexType = unsigned int;
+
+class Triangulizable2D {
+public:
+    virtual ~Triangulizable2D() = default;
+
+    virtual std::vector<vec2> generateMesh() const noexcept = 0;
+    virtual std::vector<vec2> generateStripeMesh() const noexcept = 0;
+
+    virtual std::pair<std::vector<vec2>, std::vector<IndexType>>
+        generateIndexedMesh() const noexcept = 0;
+    virtual std::pair<std::vector<vec2>, std::vector<IndexType>>
+        generateIndexedStripeMesh() const noexcept = 0;
+};
+
+class Textureable {
+public:
+    virtual ~Textureable() = default;
+
+    virtual std::vector<vec2> generateTextueCoords() const noexcept = 0;
+    //virtual std
+};
+
+//template<typename Type, template<class> typename... Args>
+
+
+template<typename Type>
+class Triangle3D {
+public:
+    Triangle3D() noexcept :
+    	k_v1(-1.0f, -1.0f, -1.0f),
+	    k_v2(1.0f, 1.0f, 1.0f),
+	    k_v3(-1.0f, 1.0f, 1.0f) { }
+    Triangle3D(const vec3 v1, const vec3 v2, const vec3 v3) noexcept :
+        k_v1(v1), k_v2(v2), k_v3(v3) { };
+
+    inline void setV1(vec3 v1) noexcept { k_v1 = v1; }
+    inline void setV2(vec3 v2) noexcept { k_v2 = v2; }
+    inline void setV3(vec3 v3) noexcept { k_v3 = v3; }
+
+    inline const vec3 v1() const noexcept { return k_v1; }
+    inline const vec3 v2() const noexcept { return k_v2; }
+    inline const vec3 v3() const noexcept { return k_v3; }
+
+    constexpr size_t size() const noexcept{  return 3; }
+
+    template<typename VertexType>
+    void exportMesh(std::vector<VertexType>& meshObject) const noexcept {
+        meshObject.reserve(meshObject.size() + size());
+
+        Type vertex;
+        // normal coordinate is the same for all vertices
+        vertex.setN3(normal());
+
+        vertex.setV3(k_v1);
+        vertex.setT2({0.0f, 0.0f});
+        meshObject.push_back(vertex);
+        vertex.setV3(k_v2);
+        vertex.setT2({1.0f, 1.0f});
+        meshObject.push_back(vertex);
+        vertex.setV3(k_v3);
+        vertex.setT2({0.0f, 1.0f});
+        meshObject.push_back(vertex);
+    }
+
+    template<typename VertexType>
+    void exportStripeMesh(std::vector<VertexType>& meshObject) const noexcept {
+        // triangle strip is the same as default triangle
+        exportMesh<Type>(meshObject);
+    }
+
+    vec3 center() const noexcept {
+        return {
+	    	(k_v1.x + k_v2.x + k_v3.x) / 3.0f,
+	    	(k_v1.y + k_v2.y + k_v3.y) / 3.0f,
+	    	(k_v1.z + k_v2.z + k_v3.z) / 3.0f
+	    };
+    }
+    float area() const noexcept {
+        const vec3 ab = k_v3 - k_v1;
+	    const vec3 ac = k_v2 - k_v1;
+	    float dist = sqrtf(glm::length2(ab) * glm::length2(ac));
+	    float cosVal = glm::dot(ab, ac) / dist;
+	    return 0.5 * dist * sqrtf(1.0 - cosVal * cosVal);
+    }
+
+    vec3 normal() const noexcept {
+        return glm::normalize(glm::cross(k_v3 - k_v1, k_v2 - k_v1));
+    }
+    vec3 inverseNormal() const noexcept { 
+        return -normal();
+    }
+
+protected:
+    vec3 k_v1, k_v2, k_v3;
+};
+
+template<typename Type>
+class Circle2D  {
+protected:
+    float m_radius;
+    vec2 pos;
+
+public:
+    Circle2D() noexcept : 
+        m_radius(static_cast<Type>(1)),
+        pos(static_cast<Type>(0)) { }
+    Circle2D(Type radius) noexcept :
+        m_radius(radius),
+        pos(static_cast<Type>(0)) { }
+    Circle2D(float radius, vec2 position) noexcept :
+        m_radius(radius), pos(position) { }
+    Circle2D(float radius, Type x, Type y) noexcept :
+        m_radius(radius, {x, y}) { }
+
+    template<typename VertexType> 
+    void exportMesh(std::vector<VertexType> &meshObject) const noexcept {
+
+    }
+
+    template<typename VertexType> 
+    void exportStripeMesh(std::vector<VertexType> &meshObject) const noexcept {
+
+    }
+};
 
 struct Indice {
     int v, t, n;
@@ -193,6 +452,7 @@ public:
 };
 
 enum ExportType {
+    EXPORT_NONE,
     EXPORT_VERTEX,
     EXPORT_VERTEX_INDEXED,
     EXPORT_TEXTURE,
@@ -236,6 +496,8 @@ public:
     virtual ~MeshBuilderBase() = default;
 
     ExportFile exportData() const;
+
+    size_t size() const noexcept;
 
 protected:
     virtual bool resolveTypes(std::vector<float> &data, size_t i) const = 0;
@@ -324,20 +586,26 @@ public:
 
     template<typename Iterator>
     MeshBuilder2D& addVertices(Iterator begin, Iterator end) {
+        vertices.reserve(vertices.size() + std::distance(begin, end));
         vertices.insert(vertices.end(), begin, end);
         return *this;
     }
     template<typename Iterator>
     MeshBuilder2D& addTextureCoords(Iterator begin, Iterator end) {
+        texCoords.reserve(texCoords.size() + std::distance(begin, end));
         texCoords.insert(texCoords.end(), begin, end);
         return *this;
     }
     template<typename Iterator>
     MeshBuilder2D& addColors(Iterator begin, Iterator end) {
+        colors.reserve(colors.size() + std::distance(begin, end));
         colors.insert(colors.end(), begin, end);
         return *this;
     }
 
+    MeshBuilder2D& addMesh(const MeshBuilder2D &mesh) noexcept;
+    MeshBuilder2D& addCircle(size_t pcount, float radius, bool strip=false);
+    MeshBuilder2D& addRect(float x, float y, float width, float height);
     MeshBuilder2D& addPolygon(
         const std::vector<vec2> &polygon,
         const std::vector<std::vector<vec2>> &holes = {}, bool indexed=false);
@@ -354,6 +622,8 @@ public:
     void setColors(std::vector<glm::vec3>&& colors);
 
     void generateDefaultIndices();
+    void generateNormals(bool indexed=false);
+
     void setVIndices(const std::vector<int> &v_indices);
     void setVTIndices(const std::vector<int> &vt_indices);
     void setVIndices(std::vector<int>&& v_indices);
@@ -364,10 +634,9 @@ public:
     const std::vector<glm::vec3>& getColors() const;
 
     const std::vector<int>& getV_indices() const;
+    const std::vector<int>& getVc_indices() const;
     const std::vector<int>& getVt_indices() const;
 
-    std::vector<Vertex2D> toVertexArray(float scaleModif=1.0f);
-    std::vector<Vertex2D> toVertexArrayIndexed(float scaleModif=1.0f);
 
     std::string info();
 };
@@ -441,6 +710,8 @@ class Material
 
 class MeshBuilder {
 public:
+    using IndexType = unsigned int;
+
     std::vector<glm::vec3> vertices;
     std::vector<glm::vec3> normals;
     std::vector<glm::vec2> texcoords;
@@ -522,6 +793,7 @@ public:
     void setVTIndices(const std::vector<int> &indices);
     void setVCIndices(const std::vector<int> &indices);
 
+    void generateNormals(bool indexed=false, bool side=true) noexcept;
     void generateDefaultIndices();
 
     const std::vector<glm::vec3>& getVertices() const;
@@ -533,52 +805,6 @@ public:
     const std::vector<int>& getVNIndices() const;
     const std::vector<int>& getVTIndices() const;
     const std::vector<int>& getVCIndices() const;
-
-    std::vector<Vertex> toVertexArray();
-    std::vector<PointVertex> toPointVertexArray();
-    std::vector<NormalVertex> toNormalVertexArray();
-
-    std::vector<Vertex> toVertexArrayIndexed();
-    std::vector<PointVertex> toPointVertexArrayIndexed();
-    std::vector<NormalVertex> toNormalVertexArrayIndexed();
-};
-
-class Triangle {
-public:
-    Triangle();
-    Triangle(const glm::vec3 v1,
-        const glm::vec3 v2, const glm::vec3 v3);
-
-    glm::vec3& v1();
-    glm::vec3& v2();
-    glm::vec3& v3();
-
-    const glm::vec3& v1() const;
-    const glm::vec3& v2() const;
-    const glm::vec3& v3() const;
-
-    glm::vec3 center() const;
-    float area() const;
-    glm::vec3 normal() const;
-
-protected:
-    glm::vec3 k_v1, k_v2, k_v3;
-};
-
-class TriangleBuilder {
-public:
-    void clear();
-
-    void scale();
-    void unify();
-    void center();
-        
-    void addTriangle(const Triangle &triangle);
-    void addTriangle(const glm::vec3 &v1, const glm::vec3 &v2, const glm::vec3 &v3);
-    
-    const std::vector<Triangle>& triangles();
-protected:
-    std::vector<Triangle> k_triangles;
 };
 
 class DataBlob {

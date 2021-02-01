@@ -74,23 +74,27 @@ void ShaderBase::cleanUp()
 }
 
 void showShaderLog(GLuint shader) {
-    spdlog::info("Could not link Shader!");
     GLint logSize = 0;
     CGL(glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logSize));
-    std::vector<GLchar> errorLog(static_cast<size_t>(logSize + 1));
-    errorLog[static_cast<size_t>(logSize)] = '\0';
-    CGL(glGetShaderInfoLog(shader, logSize, &logSize, &errorLog[0]));
-    spdlog::error("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{}", errorLog.data());
+    if (logSize > 0) {
+        spdlog::info("Shader compilation output:");
+        std::vector<GLchar> errorLog(static_cast<size_t>(logSize + 1));
+        errorLog[static_cast<size_t>(logSize)] = '\0';
+        CGL(glGetShaderInfoLog(shader, logSize, &logSize, &errorLog[0]));
+        spdlog::error("ERROR::SHADER::VERTEX::COMPILATION_FAILED\n{}", errorLog.data());
+    }
 }
 
 void showInfoLog(GLuint program) {
-    spdlog::info("Could not link Program");
     GLint logSize = 0;
     CGL(glGetProgramiv(program, GL_INFO_LOG_LENGTH, &logSize));
-    std::vector<GLchar> errorLog(static_cast<size_t>(logSize) + 1);
-    errorLog[static_cast<size_t>(logSize)] = '\0';
-    CGL(glGetProgramInfoLog(program, logSize, &logSize, &errorLog[0]));
-    spdlog::error("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{}", errorLog.data());
+    if (logSize > 0) {
+        spdlog::info("Shader linking output");
+        std::vector<GLchar> errorLog(static_cast<size_t>(logSize) + 1);
+        errorLog[static_cast<size_t>(logSize)] = '\0';
+        CGL(glGetProgramInfoLog(program, logSize, &logSize, &errorLog[0]));
+        spdlog::error("ERROR::SHADER::PROGRAM::LINKING_FAILED\n{}", errorLog.data());
+    }
 }
 
 void ShaderBase::cleanupParts(GLuint vertex_shader, GLuint fragment_shader) {
@@ -134,8 +138,8 @@ void ShaderBase::create() {
             CGL(glAttachShader(program, vertex_shader));
 
             CGL(glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &success));
+            showShaderLog(vertex_shader);
             if(!success) {
-                showShaderLog(vertex_shader);
                 cleanupParts(vertex_shader, fragment_shader);
                 cleanupProgram();
                 throw std::runtime_error("Could not load vertex shader");
@@ -158,8 +162,8 @@ void ShaderBase::create() {
             CGL(glAttachShader(program, fragment_shader));
 
             CGL(glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &success));
+            showShaderLog(fragment_shader);
             if(!success) {
-                showShaderLog(fragment_shader);
                 cleanupParts(vertex_shader, fragment_shader);
                 cleanupProgram();
                 throw std::runtime_error("Could not load fragment shader");
@@ -171,8 +175,8 @@ void ShaderBase::create() {
 
         CGL(glLinkProgram(program));
         CGL(glGetProgramiv(program, GL_LINK_STATUS, &success));
+        showInfoLog(program);
         if(!success) {
-            showInfoLog(program);
             cleanupParts(vertex_shader, fragment_shader);
             cleanupProgram();
             throw std::runtime_error("Could not link shader");
@@ -230,7 +234,7 @@ GLint ShaderBase::uniformLocation(const std::string &name, bool required) {
     GLint v = glGetUniformLocation(program, name.c_str());
     if (required && v == -1) {
         NYREM_DEBUG_BREAK;
-        throw std::runtime_error("Could not load uniform " + name);
+        throw std::runtime_error("Could not load uniform '" + name + '\'');
     }
     return v;
 }
@@ -316,7 +320,7 @@ void TickerList::updateAll(float dt) {
 
 RectStageBuffer::RectStageBuffer(
     const RenderList<TransformableEntity2D>& renderList,
-    const std::shared_ptr<const Camera> &camera)
+    const std::shared_ptr<const ViewTransformer> &camera)
     : renderList(renderList), camera(camera) { }
 
 
@@ -345,7 +349,7 @@ RectShader& RectShader::operator=(RectShader &&sh)
 
 void RectShader::render(
     const RenderList<TransformableEntity2D>& renderList,
-    const std::shared_ptr<const Camera> &camera) {
+    const std::shared_ptr<const ViewTransformer> &camera) {
     bind();
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
@@ -354,7 +358,7 @@ void RectShader::render(
 
     nyrem::mat4x4 transformCam;
     if (camera)
-        transformCam = camera->projectionMatrix() * camera->viewMatrix();
+        transformCam = camera->matrix();
     
     for (auto& entity : renderList) {
         if (camera)
@@ -398,10 +402,10 @@ void RectShader::initializeUniforms() {
 
 // ---- SimpleMVPShader ---- //
 MVPListStageBuffer::MVPListStageBuffer() :
-    camera(std::make_shared<TransformedCamera>()),
+    camera(std::make_shared<ViewTransformer>()),
     list(std::make_shared<RenderList<Entity>>()) { }
 MVPListStageBuffer::MVPListStageBuffer(
-    const std::shared_ptr<Camera>& pCamera,
+    const std::shared_ptr<ViewTransformer>& pCamera,
     const std::shared_ptr<RenderList<Entity>>& pList)
     : camera(pCamera), list(pList) { }
 
@@ -424,7 +428,7 @@ SimpleMVPShader& SimpleMVPShader::operator=(SimpleMVPShader&& sh)
 }
 
 // TODO
-void SimpleMVPShader::render(const Camera& camera, const RenderList<Entity>& list) {
+void SimpleMVPShader::render(const ViewTransformer& camera, const RenderList<Entity>& list) {
     bind();
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -432,7 +436,7 @@ void SimpleMVPShader::render(const Camera& camera, const RenderList<Entity>& lis
     // loads the uniforms that stay the same during drawcall
     
 
-    glm::mat4x4 cam = camera.projectionMatrix() * camera.viewMatrix();
+    glm::mat4x4 cam = camera.matrix();
     for (auto& entity : list) {
         if (!entity->hasModel()) continue;
 
@@ -454,13 +458,13 @@ void SimpleMVPShader::loadMVPMatrix(const glm::mat4& mat) {
 
 // ---- PhongShader ---- //
 PhongListStageBuffer::PhongListStageBuffer() :
-    camera(std::make_shared<TransformedCamera>()),
+    camera(std::make_shared<ViewPipeline>()),
     renderList(std::make_shared<RenderList<Entity>>()),
     lightPosition({0.0f, 0.0f, 0.0f}),
     lightColor({1.0f, 1.0f, 1.0f})
 { }
 PhongListStageBuffer::PhongListStageBuffer(
-    const std::shared_ptr<Camera>& pCamera,
+    const std::shared_ptr<ViewPipeline>& pCamera,
     const std::shared_ptr<RenderList<Entity>>& pRenderList,
     const glm::vec3& pLightPosition, const glm::vec3& pLightColor)
     : camera(pCamera), renderList(pRenderList),
@@ -468,13 +472,13 @@ PhongListStageBuffer::PhongListStageBuffer(
 { }
 
 PhongBatchStageBuffer::PhongBatchStageBuffer() :
-    camera(std::make_shared<TransformedCamera>()),
+    camera(std::make_shared<ViewPipeline>()),
     renderList(std::make_shared<RenderBatch<Entity>>()),
     lightPosition({0.0f, 0.0f, 0.0f}),
     lightColor({1.0f, 1.0f, 1.0f})
 { }
 PhongBatchStageBuffer::PhongBatchStageBuffer(
-    const std::shared_ptr<Camera>& pCamera,
+    const std::shared_ptr<ViewPipeline>& pCamera,
     const std::shared_ptr<RenderBatch<Entity>>& pRenderList,
     const glm::vec3& pLightPosition, const glm::vec3& pLightColor)
     : camera(pCamera), renderList(pRenderList),
@@ -516,15 +520,15 @@ void PhongShader::initializeUniforms() {
     uniformMaterialPhong = uniformLocation("material");
     uniformLightPositionPhong = uniformLocation("lightPosition");
     uniformLightColorPhong = uniformLocation("lightColor");
-    uniformTextureSamplerPhong = uniformLocation("textureSampler");
     uniformColorPhong = uniformLocation("color");
 
     //uniformUseNormalTexture = uniformLocation("useNormalTexture");
     uniformUseTexture = uniformLocation("useTexture");
+    uniformTextureSamplerPhong = uniformLocation("textureSampler");
 }
 
 
-void PhongShader::render(const Camera& camera, const RenderList<Entity>& list,
+void PhongShader::render(const ViewPipeline& camera, const RenderList<Entity>& list,
     const glm::vec3& lightPosition, const glm::vec3& lightColor)
 {
     bind();
@@ -536,23 +540,35 @@ void PhongShader::render(const Camera& camera, const RenderList<Entity>& list,
     loadProjection(camera.projectionMatrix());
     loadLightPosition(lightPosition);
     loadLightColor(lightColor);
-    loadColor({1.0f, 1.0f, 1.0f});
     loadTexture(0);
 
     glm::mat4x4 cam = camera.viewMatrix();
-    for (auto& entity : list) {
+    for (const auto& entity : list) {
         if (!entity->hasModel()) continue; // entities without model are skipped
+        // loads the view transformations
         loadModelView(cam * entity->getTransformationMatrix());
         loadNormalMatrix(entity->getNormalMatrix());
 
+        // loads the entity material or uses a default one
         if (entity->hasMaterial())
             loadMaterial(entity->getMaterial()->getMaterial());
         else
             loadMaterial({0.5f, 0.5f, 0.5f, 5.0f});
         
+        // 
         loadHasTexture(entity->hasTexture());
-        if (entity->hasTexture())
+        if (entity->hasTexture()) {
             entity->getTexture()->bind();
+            loadHasTexture(true);
+        } else {
+            loadHasTexture(false);
+            const auto &colors = entity->getColorStorage();
+            if (colors.hasColor()) {
+                loadColor(colors[0]);
+            } else {
+                loadColor({1.0f, 1.0f, 1.0f});
+            }
+        }
 
         entity->getModel()->bind(); // binds the model
         glDrawArrays(GL_TRIANGLES, 0,
@@ -561,7 +577,7 @@ void PhongShader::render(const Camera& camera, const RenderList<Entity>& list,
     release();
 }
 
-void PhongShader::render(const Camera& camera, const RenderBatch<Entity>& batch,
+void PhongShader::render(const ViewPipeline& camera, const RenderBatch<Entity>& batch,
     const glm::vec3& lightPosition, const glm::vec3& lightColor) {
     bind();
     glEnable(GL_DEPTH_TEST);
@@ -687,7 +703,7 @@ std::vector<char> PhongMemoryShader::retrieveFragmentShader()
             texColor = texture(textureSampler, texCoords).xyz;
         else
             texColor = color;
-        texColor = vec3(0.5, 0.3, 0.5);
+        //texColor = vec3(0.5, 0.3, 0.5);
         vec3 color = material.x * texColor;
 
         // Calculate light direction vectors in the Phong illumination model.

@@ -41,7 +41,8 @@
     #include <string.h>
     #include <signal.h>
     #define EXPORT
-    #define NYREM_DEBUG_BREAK raise(SIGTRAP)
+    //#define NYREM_DEBUG_BREAK raise(SIGTRAP)
+    #define NYREM_DEBUG_BREAK
 // _Win32 is usually defined by compilers targeting 32 or 64 bit Windows systems
 #elif defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)   
     #define LT_PLATFORM_TARGET LT_TARGET_WIN
@@ -105,6 +106,7 @@ bool lt_check_gl_error(const char* cmd, int line, const char* file);
 #include <glad/glad.h>
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #ifdef NYREM_NAMESPACE
     #define NYREM_NAMESPACE_BEGIN namespace nyrem {
@@ -134,6 +136,8 @@ NYREM_NAMESPACE_BEGIN
 	using dvec4 = glm::dvec4;
 	using dvec3 = glm::dvec3;
 	using dvec2 = glm::dvec2;
+    
+    using quat = glm::quat;
 
 NYREM_NAMESPACE_END
 

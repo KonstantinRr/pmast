@@ -27,8 +27,22 @@
 
 using namespace traffic;
 
-MapWorld::MapWorld() {
+MapWorld::MapWorld()
+try {
+    using namespace nyrem;
+    //m_camera = std::make_shared<Camera3D>(0.01f, 100.0f, 90.0f, 1.0f);
+    m_shader = make_shader<PhongMemoryShader>();
+    m_shader_stage = std::make_shared<PhongListStage>(m_shader);
 
+    m_pipeline.addStage(m_shader_stage);
+
+    MeshBuilder cube = loadCube();
+    auto model = std::make_shared<GLModel>(cube.exporter()
+        .addColor().addNormal().addTexture().exportData());
+} catch (const std::exception &excp) {
+    m_shader = nullptr;
+    m_shader_stage = nullptr;
+    throw;
 }
 
 void MapWorld::render(const nyrem::RenderContext &context) {

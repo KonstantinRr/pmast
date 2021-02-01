@@ -127,7 +127,7 @@ public:
 	
 	Rect rect() const; 
 
-	nyrem::Camera asCamera() const noexcept;
+	std::shared_ptr<nyrem::ViewTransformer> asCamera() const noexcept;
 
 	// ---- Callbacks ---- //
 	inline nyrem::Listener<void(glm::dvec2)>& cb_leftclick() { return m_cb_leftclick; }
@@ -179,12 +179,8 @@ protected:
 	nyrem::RenderPipeline l_pipeline;
 	std::shared_ptr<nyrem::LineMemoryShader> l_shader;
 	std::shared_ptr<nyrem::RectShader> rect_shader;
-	std::shared_ptr<nyrem::RenderComponent<
-		nyrem::RectStageBuffer,
-		nyrem::RectShader>> rect_comp;
-	std::shared_ptr<nyrem::RenderComponent<
-		nyrem::LineStageBuffer,
-		nyrem::LineShader>> l_comp;
+	std::shared_ptr<nyrem::RectListStage> rect_comp;
+	std::shared_ptr<nyrem::LineStage> l_comp;
 
 	std::shared_ptr<nyrem::GLModel> m_model;
 
