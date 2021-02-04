@@ -618,6 +618,12 @@ OSMSegment OSMSegment::findSquareNodes(const Rect& r) const {
 		.setNodeAccept([r](const OSMNode& nd) {
 			return r.contains(Point(nd.getLat(), nd.getLon()));
 		})
+		.setRelationNodeAccept([r](const OSMRelation &rel, const OSMNode &nd) {
+			return r.contains(Point(nd.getLat(), nd.getLon()));
+		})
+		.setWayNodeAccept([r](const OSMWay &way, const OSMNode &nd) {
+			return r.contains(Point(nd.getLat(), nd.getLon()));	
+		})
 	);
 }
 
@@ -653,7 +659,8 @@ void OSMSegment::summary() const {
 	;
 }
 
-int64_t OSMSegment::findClosestNode(float lat, float lon) const {
+int64_t OSMSegment::findClosestNode(float lat, float lon) const
+{
 	Point p(lat, lon);
 	int64_t currentID = 0;
 	float maxDistance = 1000000000;
@@ -665,6 +672,23 @@ int64_t OSMSegment::findClosestNode(float lat, float lon) const {
 		};
 	}
 	return currentID;
+}
+
+std::vector<std::vector<glm::vec2>> OSMSegment::findBuildings() const
+{
+	using std::vector;
+	vector<vector<glm::vec2>> buildings;
+	for (const auto& way : *wayList) {
+		if (way.hasTagValue("building", "yes")) {
+			vector<glm::vec2> building;
+			for (const auto &ndID : way.getNodes()) {
+				const OSMNode &nd = getNode(ndID);
+				building.push_back(nd.asVector());
+			}
+			buildings.push_back(std::move(building));
+		}
+	}
+	return buildings;
 }
 
 OSMSegment OSMSegment::findNodes(const OSMFinder &finder) const {
@@ -683,7 +707,7 @@ OSMSegment OSMSegment::findNodes(const OSMFinder &finder) const {
 			for (int64_t id : wd.getNodes()) {
 				// iterates through the list of nodes and adds all nodes
 				// that meet the sub-requirements.
-				if (finder.acceptWayNodes(wd, getNode(id)) && newSeg.hasNodeIndex(id)) {
+				if (finder.acceptWayNodes(wd, getNode(id))) {
 					wayNodes.push_back(id);
 				}
 			}

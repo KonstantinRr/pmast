@@ -39,35 +39,37 @@ using namespace glm;
 //// ---- MapCanvas ---- ////
 
 
-MapCanvas::MapCanvas(std::shared_ptr<OSMSegment> world)
-try : m_min_zoom(2.0), m_max_zoom(1000.0) {
-	// loadMap includes resetView
-	if (world) {
+MapCanvas::MapCanvas(
+	const std::shared_ptr<OSMSegment> &world,
+	const std::shared_ptr<traffic::OSMSegment> &highway)
+	: m_min_zoom(2.0), m_max_zoom(1000.0)
+{
+	try {
 		loadMap(world);
-	} else {
+		loadHighwayMap(highway);
 		resetView();
+
+		using namespace nyrem; // is used a lot
+		MeshBuilder2D rect = loadRect2D();
+		m_model = std::make_shared<GLModel>(
+			rect.exporter().addVertex().addTexture().exportData());
+
+		// creates the shaders
+		l_shader = make_shader<LineMemoryShader>();
+		rect_shader = make_shader<MemoryRectShader>();
+		// creates the components
+		rect_comp = std::make_shared<RectListStage>(rect_shader);
+		l_comp = std::make_shared<LineStage>(l_shader);
+
+		l_pipeline.addStage(l_comp);
+		l_pipeline.addStage(rect_comp);
 	}
-
-	using namespace nyrem; // is used a lot
-	MeshBuilder2D rect = loadRect2D();
-	m_model = std::make_shared<GLModel>(
-		rect.exporter().addVertex().addTexture().exportData());
-
-	// creates the shaders
-	l_shader = make_shader<LineMemoryShader>();
-	rect_shader = make_shader<MemoryRectShader>();
-	// creates the components
-	rect_comp = std::make_shared<RectListStage>(rect_shader);
-	l_comp = std::make_shared<LineStage>(l_shader);
-
-	l_pipeline.addStage(l_comp);
-	l_pipeline.addStage(rect_comp);
-}
-catch (const std::exception &excp) {
-	l_shader = nullptr;
-	l_comp = nullptr;
-	l_pipeline.clear();
-	throw;
+	catch (const std::exception &excp) {
+		l_shader = nullptr;
+		l_comp = nullptr;
+		l_pipeline.clear();
+		throw;
+	}
 }
 
 

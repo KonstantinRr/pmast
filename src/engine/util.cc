@@ -29,6 +29,15 @@ NYREM_USE_NAMESPACE
 
 //// ---- FastSStream ---- //// 
 
+FastSStream::FastSStream() {
+	reserve(32);
+	reserveStringBuffers(32);
+}
+FastSStream::FastSStream(size_t bufferSize, size_t stringBufferSize) {
+	reserve(bufferSize);
+	reserveStringBuffers(stringBufferSize);
+}
+
 void FastSStream::add(const char *string) {
 	size_t size = std::strlen(string);
 	segments.push_back(DataSegment{
@@ -60,9 +69,22 @@ void FastSStream::add(char fill, size_t size) {
 		{.u_fill = {size, fill}}, TYPE_FILL});
 }
 
+void FastSStream::add(char fill) {
+	segments.push_back(DataSegment{
+		{.u_type_char = fill}, TYPE_INTEGER_CHAR});
+}
+
 void FastSStream::clear() {
 	segments.clear();
 	strings.clear();
+}
+
+void FastSStream::reserve(size_t size) {
+	segments.reserve(size);
+}
+
+void FastSStream::reserveStringBuffers(size_t size) {
+	strings.reserve(size);
 }
 
 std::string FastSStream::generate() const {
@@ -81,6 +103,10 @@ std::string FastSStream::generate() const {
 				break;
 			case TYPE_STRING_INDEX:
 				size += strings[seg.u_index].size();
+				break;
+			case TYPE_UINTEGER_CHAR:
+			case TYPE_INTEGER_CHAR:
+				size += 1;
 				break;
 		}
 	}
@@ -104,10 +130,20 @@ std::string FastSStream::generate() const {
 				std::memset(&data[index], seg.u_fill.fill,
 					seg.u_fill.size);
 				index += seg.u_fill.size;
+				break;
 			case TYPE_STRING_INDEX:
 				std::memcpy(&data[index], strings[seg.u_index].data(),
 					strings[seg.u_index].size());
 				index += strings[seg.u_index].size();
+				break;
+			case TYPE_UINTEGER_CHAR:
+				data[index] = seg.u_type_uchar;
+				index += 1;
+				break;
+			case TYPE_INTEGER_CHAR:
+				data[index] = seg.u_type_char;
+				index += 1;
+				break;
 		}
 	}
 	return data;

@@ -54,7 +54,8 @@ class Route; // externally defined Route class
 class MapCanvas : public nyrem::Renderable {
 public:
 	MapCanvas(
-		std::shared_ptr<traffic::OSMSegment> map);
+		const std::shared_ptr<traffic::OSMSegment> &map,
+		const std::shared_ptr<traffic::OSMSegment> &highway);
 
 	inline nyrem::RenderPipeline& getPipeline() {
 		return l_pipeline;

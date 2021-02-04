@@ -16,18 +16,19 @@ option(OPTIMIZE_SPEED "Optimizes for speed" OFF)
 # The project and dependencies rely on the C11 standard.
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-# The project and dependencies rely on the CXX17 standard.
+# The project and dependencies rely on the CXX20 standard.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
-#include(CheckCXXSourceRuns)
+include(CheckCXXSourceRuns)
 
 # This macro checks whether a specific CXX compiler and linker flags work.
 macro(CHECK_CXX_COMPILER_AND_LINKER_FLAGS_BASE _RESULT _CXX_FLAGS _LINKER_FLAGS)
   set(CMAKE_REQUIRED_FLAGS ${_CXX_FLAGS})
   set(CMAKE_REQUIRED_LIBRARIES ${_LINKER_FLAGS})
   set(CMAKE_REQUIRED_QUIET TRUE)
+  check_cxx_source_runs("#include <iostream>\nint main(int argc, char **argv) { std::cout << \"test\"; return 0; }" ${_RESULT})
   set(CMAKE_REQUIRED_FLAGS "")
   set(CMAKE_REQUIRED_LIBRARIES "")
 endmacro()

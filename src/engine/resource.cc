@@ -24,6 +24,7 @@
 /// July 2020
 
 #include <engine/resource.hpp>
+#include <engine/util.hpp>
 
 #include <spdlog/spdlog.h>
 #include <glm/glm.hpp>
@@ -133,6 +134,7 @@ void HeightMap::fillRandom() {
     }
 }
 
+
 ExportMacro::ExportMacro(ExportType type)
 	: type(type)
 {
@@ -151,10 +153,48 @@ ExportMacro::ExportMacro(ExportType type)
 	}
 }
 
-size_t ExportFile::strideSize() {
+size_t ExportFile::strideSize() const noexcept {
 	size_t s = 0;
-	for (ExportMacro macro : exp) s += macro.size;
+	for (ExportMacro macro : exp)
+		s += macro.size;
 	return s;
+}
+std::string ExportFile::info() const {
+	return fmt::format("ExportFile[dataSize: {}, exportMacros: {}]",
+		data.size(), exp.size());
+}
+std::string ExportFile::detail(char seperator, bool separateSegments) const {
+	FastSStream stream(
+		data.size() * 3 + exp.size() * 3 + 2,
+		data.size() + exp.size());
+	
+	size_t rowLengthMacro = 1;
+	
+	stream.add("==== Detailed Export File Data Report: ====");
+	for (size_t i = 0; i < data.size();) {
+		stream.add('\n');
+		for (const auto &expMacro : exp) {
+			for (size_t k = 0; k < expMacro.size; k++) {
+				stream.add(data[i]);
+				stream.add(seperator);
+				i++;
+			}
+			if (separateSegments) {
+				stream.add('|');
+				stream.add(seperator);
+			}
+		}
+		stream.add('\t');
+	}
+
+	stream.add("\n====Detailed Export Macro Report:====");
+	for (size_t i = 0; i < exp.size(); i++) {
+		if (i % rowLengthMacro == 0)
+			stream.add('\n');
+		stream.add(exportNames[exp[i].type].exportName);
+		stream.add(seperator);
+	}
+	return stream.generate();
 }
 
 template<typename Type, typename VType>
@@ -411,6 +451,24 @@ MeshBuilder2D& MeshBuilder2D::addMesh(const MeshBuilder2D &mesh) noexcept
 //}
 MeshBuilder2D& MeshBuilder2D::addRect(float x, float y, float width, float height)
 {
+	return addRect({x, y}, {width, height});
+}
+
+MeshBuilder2D& MeshBuilder2D::addRect(vec2 center, vec2 offset) {
+	vec2 newVertices[6] = {
+		center + vec2(-offset.x, -offset.y),
+		center + vec2( offset.x,  offset.y),
+		center + vec2(-offset.x,  offset.y),
+		center + vec2(-offset.x, -offset.y),
+		center + vec2( offset.x, -offset.y),
+		center + vec2( offset.x,  offset.y)
+	};
+	vec2 newTexCoords[] = {
+		{0.0f, 0.0f}, {1.0f, 1.0f}, {0.0f, 1.0f},
+		{0.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f}
+	};
+	addVertices(std::begin(newVertices), std::end(newVertices));
+	addTextureCoords(std::begin(newTexCoords), std::end(newTexCoords));
 	return *this;
 }
 
@@ -654,6 +712,29 @@ size_t MeshBuilder::minYExtentIndex() const { return impl_minYExtentIndex(vertic
 size_t MeshBuilder::maxZExtentIndex() const { return impl_maxZExtentIndex(vertices); }
 size_t MeshBuilder::minZExtentIndex() const { return impl_minZExtentIndex(vertices); }
 
+void MeshBuilder::add(
+	const MeshBuilder2D &mesh, float height,
+	bool srcIndex, bool dstIndex) noexcept
+{
+	const auto& verts2D = mesh.getVertices();
+	vertices.reserve(vertices.size() + mesh.getVertices().size());	
+	for (size_t i = 0; i < verts2D.size(); i++) {
+		normals.push_back(vec3(0.0f, 1.0f, 0.0f));
+		vertices.push_back(vec3(verts2D[i], height));
+	}
+	
+	addTextureCoords(
+		mesh.getTextureCoords().begin(),
+		mesh.getTextureCoords().end());
+	addColors(
+		mesh.getColors().begin(),
+		mesh.getColors().end());
+
+	addVerticeIndices(mesh.getV_indices().begin(), mesh.getV_indices().end());
+	addTextureIndices(mesh.getVt_indices().begin(), mesh.getVt_indices().end());
+	addColorIndices(mesh.getVc_indices().begin(), mesh.getVc_indices().end());
+}
+
 void MeshBuilder::scale(float scale) {
 	for (size_t i = 0; i < vertices.size(); i++) {
 		vertices[i] *= scale;
@@ -754,6 +835,38 @@ void MeshBuilder::setNormals(const std::vector<glm::vec3> &pNormals) { this->nor
 void MeshBuilder::setTexCoords(const std::vector<glm::vec2> &pTexCoords) { this->texcoords = pTexCoords; }
 void MeshBuilder::setColors(const std::vector<glm::vec3> &colors) { this->colors = colors; }
 
+MeshBuilder& MeshBuilder::addCube(vec3 center, float dimension) noexcept {
+	return addCube(center, vec3(dimension));
+}
+MeshBuilder& MeshBuilder::addCube(vec3 c, vec3 d) noexcept {
+	vec3 newVertices[36] = {
+		c + vec3(-d.x, -d.y, -d.z), c + vec3(-d.x, -d.y,  d.z), c + vec3(-d.x,  d.y,  d.z),
+		c + vec3( d.x,  d.y, -d.z), c + vec3(-d.x, -d.y, -d.z), c + vec3(-d.x,  d.y, -d.z),
+		c + vec3( d.x, -d.y,  d.z), c + vec3(-d.x, -d.y, -d.z), c + vec3( d.x, -d.y, -d.z),
+		c + vec3( d.x,  d.y, -d.z), c + vec3( d.x, -d.y, -d.z), c + vec3(-d.x, -d.y, -d.z),
+		c + vec3(-d.x, -d.y, -d.z), c + vec3(-d.x,  d.y,  d.z), c + vec3(-d.x,  d.y, -d.z),
+		c + vec3( d.x, -d.y,  d.z), c + vec3(-d.x, -d.y,  d.z), c + vec3(-d.x, -d.y, -d.z), 
+		c + vec3(-d.x,  d.y,  d.z), c + vec3(-d.x, -d.y,  d.z), c + vec3( d.x, -d.y,  d.z),
+		c + vec3( d.x,  d.y,  d.z), c + vec3( d.x, -d.y, -d.z), c + vec3( d.x,  d.y, -d.z),
+		c + vec3( d.x, -d.y, -d.z), c + vec3( d.x,  d.y,  d.z), c + vec3( d.x, -d.y,  d.z),
+		c + vec3( d.x,  d.y,  d.z), c + vec3( d.x,  d.y, -d.z), c + vec3(-d.x,  d.y, -d.z),
+		c + vec3( d.x,  d.y,  d.z), c + vec3(-d.x,  d.y, -d.z), c + vec3(-d.x,  d.y,  d.z),
+		c + vec3( d.x,  d.y,  d.z), c + vec3(-d.x,  d.y,  d.z), c + vec3( d.x, -d.y,  d.z),
+	};
+	vec2 newTextureCoords[36] = {
+		{ 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+		{ 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+		{ 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+		{ 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+		{ 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+		{ 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f },
+	};
+	addVertices(std::begin(newVertices), std::end(newVertices));
+	addTextureCoords(std::begin(newTextureCoords), std::end(newTextureCoords));
+	generateNormals(false);
+	return *this;
+}
+
 void MeshBuilder::setVIndices(const std::vector<int> &pIndices) { this->v_indices = pIndices; }
 void MeshBuilder::setVNIndices(const std::vector<int> &pIndices) { this->vn_indices = pIndices; }
 void MeshBuilder::setVTIndices(const std::vector<int> &pIndices) { this->vt_indices = pIndices; }
@@ -766,11 +879,9 @@ void MeshBuilder::generateNormals(bool indexed, bool side) noexcept
 	if (indexed) {
 		normals.reserve(v_indices.size());
 		for (size_t i = 0; i + 3 <= v_indices.size();) {
-			Triangle3D<float> tri(
-				vertices[v_indices[i + 0]],
-				vertices[v_indices[i + 1]],
-				vertices[v_indices[i + 2]]);
-			vec3 normal = side ? tri.normal() : tri.inverseNormal();
+			const vec3 ab = vertices[v_indices[i + 2]] - vertices[v_indices[i + 1]];
+	        const vec3 ac = vertices[v_indices[i + 0]] - vertices[v_indices[i + 1]];
+			vec3 normal = glm::normalize(glm::cross(ab, ac));
 			normals.push_back(normal);
 			vn_indices.push_back(static_cast<IndexType>(i));
 			vn_indices.push_back(static_cast<IndexType>(i));
@@ -779,12 +890,10 @@ void MeshBuilder::generateNormals(bool indexed, bool side) noexcept
 	} else {
 		normals.clear();
 		normals.reserve(vertices.size());
-		for (size_t i = 0; i + 3 <= normals.size(); i += 3) {
-			Triangle3D<float> tri(
-				vertices[i + 0],
-				vertices[i + 1],
-				vertices[i + 2]);
-			vec3 normal = side ? tri.normal() : tri.inverseNormal();
+		for (size_t i = 0; i + 3 <= vertices.size(); i += 3) {
+			const vec3 ab = vertices[i + 2] - vertices[i + 1];
+	        const vec3 ac = vertices[i + 0] - vertices[i + 1];
+			vec3 normal = glm::normalize(glm::cross(ab, ac));
 
 			normals.push_back(normal);
 			normals.push_back(normal);

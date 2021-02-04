@@ -125,7 +125,9 @@ double traffic::simpleDistanceSquared(glm::dvec2 p1, glm::dvec2 p2)
 
 // ---- Mesh Generation ---- //
 
-void applyNodes(const std::vector<int64_t> nds, const OSMSegment& map,
+void applyNodes(
+	const std::vector<int64_t> nds,
+	const OSMSegment& map,
 	std::vector<glm::vec2> &points)
 {
 	if (nds.empty()) return;
@@ -133,6 +135,9 @@ void applyNodes(const std::vector<int64_t> nds, const OSMSegment& map,
 	vec2 center(centerP.getLongitude(), centerP.getLatitude());
 	auto& nodeList = *(map.getNodes());
 
+	// reserves enough memory to fit the whole model
+	points.reserve(points.size() + nds.size() - 1);
+	
 	int64_t lastNode = nds[0];
 	for (size_t i = 1; i < nds.size(); i++)
 	{

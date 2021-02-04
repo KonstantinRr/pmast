@@ -44,13 +44,19 @@ namespace traffic {
 
 class MapWorld : public nyrem::Renderable {
 public:
-    MapWorld();
+    MapWorld(
+        const std::shared_ptr<traffic::OSMSegment> &map,
+        const std::shared_ptr<traffic::OSMSegment> &highwayMap);
 
     virtual void render(const nyrem::RenderContext &context) override;
 
 protected:
+    std::shared_ptr<traffic::OSMSegment> m_highwayMap;
+    std::shared_ptr<traffic::OSMSegment> m_map;
+
     nyrem::RenderPipeline m_pipeline;
 
+    std::shared_ptr<nyrem::RenderList<nyrem::Entity>> m_entities;
     std::shared_ptr<nyrem::Camera3D<>> m_camera;
     std::shared_ptr<nyrem::PhongShader> m_shader;
     std::shared_ptr<nyrem::PhongListStage> m_shader_stage;

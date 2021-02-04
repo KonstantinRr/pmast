@@ -56,7 +56,7 @@ public:
 
 class CalculateMatrix {
 public:
-	constexpr bool hasBuffer() const { return false; }
+	static constexpr bool hasBuffer() { return false; }
 };
 
 class BufferMatrix {
@@ -66,7 +66,7 @@ protected:
 public:
 	BufferMatrix() noexcept = default;
 
-	constexpr bool hasBuffer() const { return true; }
+	static constexpr bool hasBuffer() { return true; }
 
 	inline void store(const mat4x4 &mat) const noexcept { buffer = mat; }
 	inline const mat4x4& get() const noexcept { return buffer; }
@@ -82,7 +82,7 @@ protected:
 
 	template<typename Buffer, typename Exec>
 	mat4x4 bufferOrMatrix(const Buffer &buffer, bool &dirty, Exec && exec) const noexcept {
-		if constexpr (buffer.hasBuffer()) {
+		if constexpr (Buffer::hasBuffer()) {
 			if (dirty) {
 				auto storeMatrix = exec();
 				buffer.store(storeMatrix);
@@ -337,6 +337,22 @@ public:
 	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = m_inverse_matrix * vec; }
 };
 
+struct Projection3DSettings {
+	float m_nearPlane;
+	float m_farPlane;
+	float m_fov;
+	float m_aspectRatio;
+
+	constexpr Projection3DSettings() noexcept :
+		m_nearPlane(0.01f), m_farPlane(100.0f),
+		m_fov(90.0f), m_aspectRatio(1.0f) { }
+
+	constexpr Projection3DSettings(float nearPlane, float farPlane,
+		float fov, float aspectRatio) noexcept :
+    	m_nearPlane(nearPlane), m_farPlane(farPlane),
+    	m_fov(fov), m_aspectRatio(aspectRatio) { }
+};
+
 template<
 	typename ForwardBuffer = BufferMatrix,
 	typename BackwardBuffer = CalculateMatrix>
@@ -344,54 +360,60 @@ class Projection3D :
 	public ViewTransformer,
 	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
 public:
-	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
+	using ThisType = Projection3D<ForwardBuffer, BackwardBuffer>;
+	using Projection3DType = ThisType;
+
+	using TypeMatrixBuffer = MatrixBuffer<ForwardBuffer, BackwardBuffer>;
 
 protected:
-	float m_nearPlane;
-	float m_farPlane;
-	float m_fov;
-	float m_aspectRatio;
+	Projection3DSettings m_settings;
 
 	mat4x4 projectionMatrix() const noexcept {
 		return TypeMatrixBuffer::forwardBufferOrMatrix([this]() {
 			return glm::perspective(
-				m_fov, m_aspectRatio, m_nearPlane, m_farPlane); });
+				m_settings.m_fov, m_settings.m_aspectRatio,
+				m_settings.m_nearPlane, m_settings.m_farPlane); });
 	}
 
 	mat4x4 inverseProjectionMatrix() const noexcept {
 		return TypeMatrixBuffer::backwardBufferOrMatrix([this]() {
 			return glm::inverse(glm::perspective(
-				m_fov, m_aspectRatio, m_nearPlane, m_farPlane)); });
+				m_settings.m_fov, m_settings.m_aspectRatio,
+				m_settings.m_nearPlane, m_settings.m_farPlane)); });
 	}
 
 public:
-	Projection3D() noexcept :
-		m_nearPlane(0.01f), m_farPlane(100.0f),
-		m_fov(90.0f), m_aspectRatio(1.0f) { }
+	Projection3D() noexcept { }
 
-	Projection3D(float nearPlane, float farPlane,
-		float fov, float aspectRatio) noexcept :
-    	m_nearPlane(nearPlane), m_farPlane(farPlane),
-    	m_fov(fov), m_aspectRatio(aspectRatio) { }
+	Projection3D(Projection3DSettings settings) noexcept :
+    	m_settings(settings) { }
+
+	// allows creating different buffered projections from each other
+	template<typename PForwardBuffer, typename PBackwardBuffer>
+	Projection3D(const Projection3D<PForwardBuffer, PBackwardBuffer> &proj) noexcept :
+		m_settings(proj.settings()) { }
+
 
 	virtual ~Projection3D() = default;
 
 	void setNearPlane(float nearPlane) {
-		m_nearPlane = nearPlane;
+		m_settings.m_nearPlane = nearPlane;
 		TypeMatrixBuffer::makeDirty();
 	}
 	void setFarPlane(float farPlane) {
-		m_farPlane = farPlane;
+		m_settings.m_farPlane = farPlane;
 		TypeMatrixBuffer::makeDirty();
 	}
 	void setFOV(float fov) {
-		m_fov = fov;
+		m_settings.m_fov = fov;
 		TypeMatrixBuffer::makeDirty();
 	}
 	void setAspectRatio(float aspectRatio) {
-		m_aspectRatio = aspectRatio;
+		m_settings.m_aspectRatio = aspectRatio;
 		TypeMatrixBuffer::makeDirty();
 	}
+
+	inline const Projection3DSettings& settings() const noexcept { return m_settings; }
 
 	virtual mat4x4 matrix() const noexcept override { return projectionMatrix(); }
 	virtual mat4x4 inverse() const noexcept override { return inverseProjectionMatrix(); }
@@ -401,6 +423,18 @@ public:
 	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = inverseProjectionMatrix() * vec; }
 };
 
+struct Translation3DSettings {
+	using ThisType = Translation3DSettings;
+	using Translation3DSettingsType = Translation3DSettings;
+
+	vec3 translation;
+
+	Translation3DSettings() noexcept : translation(0.0f) { }
+	Translation3DSettings(float v) noexcept : translation(v) { }
+	Translation3DSettings(float x, float y, float z) noexcept : translation(x, y, z) { }
+	Translation3DSettings(const vec3& pos) noexcept : translation(pos) { }
+};
+
 template<
 	typename ForwardBuffer = CalculateMatrix,
 	typename BackwardBuffer = CalculateMatrix>
@@ -408,53 +442,92 @@ class Translation3D :
 	public ViewTransformer, 
 	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
 public:
+	using ThisType = Translation3D<ForwardBuffer, BackwardBuffer>;
+	using Translation3DType = ThisType;
+
 	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
 
 protected:
-	vec3 m_position;
+	Translation3DSettings m_settings;
 
 	mat4x4 translationMatrix() const noexcept {
 		return TypeMatrixBuffer::forwardBufferOrMatrix(
-			[this]() { return glm::translate(mat4x4(1.0f), m_position); });
+			[this]() { return glm::translate(mat4x4(1.0f), m_settings.translation); });
 	}
 	mat4x4 inverseTranslationMatrix() const noexcept {
 		return TypeMatrixBuffer::backwardBufferOrMatrix(
-			[this]() { return glm::translate(mat4x4(1.0f), -m_position); });
+			[this]() { return glm::translate(mat4x4(1.0f), -m_settings.translation); });
 	}
 
 public:
-	Translation3D() noexcept : m_position(0.0f) { }
-	Translation3D(float v) noexcept : m_position(v) { }
-	Translation3D(float x, float y, float z) noexcept : m_position(x, y, z) { }
-	Translation3D(const vec3& pos) noexcept : m_position(pos) { }
+	Translation3D() noexcept { }
+	Translation3D(const Translation3DSettings &settings) noexcept :
+		m_settings(settings) { }
 
-	void set(vec3 position) {
-		m_position = position;
-		TypeMatrixBuffer::makeDirty();
-	}
+	template<typename PForwardBuffer, typename PBackwardBuffer>
+	Translation3D(const Translation3D<PForwardBuffer, PBackwardBuffer> &trans) noexcept :
+		m_settings(trans.settings()) { }
 
 	virtual ~Translation3D() = default;
+
+	const Translation3DSettings& settings() const noexcept { return m_settings; }
+
+	void set(vec3 position) {
+		m_settings.translation = position;
+		TypeMatrixBuffer::makeDirty();
+	}
 
 	virtual mat4x4 matrix() const noexcept override { return translationMatrix(); }
 	virtual mat4x4 inverse() const noexcept override { return inverseTranslationMatrix(); }
 	
 	virtual void passthrough(mat4x4 &mat) const noexcept override {
-		mat = glm::translate(mat, m_position);
+		mat = glm::translate(mat, m_settings.translation);
 	}
 	virtual void passthrough(vec4 &vec) const noexcept override {
-		vec.x += m_position.x;
-		vec.y += m_position.y;
-		vec.z += m_position.z;
+		vec.x += m_settings.translation.x;
+		vec.y += m_settings.translation.y;
+		vec.z += m_settings.translation.z;
 	}
 
 	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
-		mat = glm::translate(mat, -m_position);
+		mat = glm::translate(mat, -m_settings.translation);
 	}
 	virtual void passthroughInverse(vec4 &vec) const noexcept override {
-		vec.x -= m_position.x;
-		vec.y -= m_position.y;
-		vec.z -= m_position.z;
+		vec.x -= m_settings.translation.x;
+		vec.y -= m_settings.translation.y;
+		vec.z -= m_settings.translation.z;
 	}
+};
+
+struct RotationSettings3DEuler {
+	using ThisType = RotationSettings3DEuler;
+	using RotationSettings3DEulerType = ThisType;
+
+	vec3 m_rollPitchYaw;
+
+	RotationSettings3DEuler() noexcept : m_rollPitchYaw(0.0f) { }
+	RotationSettings3DEuler(float v) : m_rollPitchYaw(v) { }
+	RotationSettings3DEuler(float roll, float pitch, float yaw) noexcept :
+		m_rollPitchYaw(roll, pitch, yaw) { }	
+	RotationSettings3DEuler(vec3 rollPitchYaw) noexcept :
+		m_rollPitchYaw(rollPitchYaw) { }
+};
+
+struct RotationSettings3DQuat {
+	using ThisType = RotationSettings3DQuat;
+	using RotationSettings3DQuatType = ThisType;
+
+	quat m_quaternion;
+
+	RotationSettings3DQuat() noexcept { }
+	RotationSettings3DQuat(const RotationSettings3DEuler& euler) noexcept :
+		m_quaternion(euler.m_rollPitchYaw) { }
+	RotationSettings3DQuat(float w, float x, float y, float z) noexcept :
+		m_quaternion(w, x, y, z) { }
+	RotationSettings3DQuat(const vec4 &quat) noexcept :
+		m_quaternion(quat) { }
+	RotationSettings3DQuat(const quat &quaternion) noexcept :
+		m_quaternion(quaternion) { }
 };
 
 template<
@@ -464,6 +537,9 @@ class Rotation3D :
 	public ViewTransformer,
 	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
 public:
+	using ThisType = Rotation3D<ForwardBuffer, BackwardBuffer>;
+	using Rotation3DType = ThisType;
+
 	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
 
 protected:
@@ -480,18 +556,22 @@ protected:
 
 public:
 	Rotation3D() = default;
-	Rotation3D(float roll, float pitch, float yaw) noexcept :
-		m_quaternion({roll, pitch, yaw}) { }
-	Rotation3D(const vec3 &euler) noexcept :
-		m_quaternion(euler) { }
-	Rotation3D(float w, float x, float y, float z) noexcept :
-		m_quaternion(w, x, y, z) { }
+	Rotation3D(const RotationSettings3DEuler& euler) noexcept :
+		m_quaternion(euler.m_rollPitchYaw) { }
+	Rotation3D(const RotationSettings3DQuat& quaternion) noexcept :
+		m_quaternion(quaternion.m_quaternion) { }
 
-	Rotation3D(const vec4 &quat) noexcept :
-		m_quaternion(quat) { }
-	Rotation3D(const quat &quaternion) noexcept :
-		m_quaternion(quaternion) { }
+	template<typename PForwardBuffer, typename PBackwardBuffer>
+	Rotation3D(const Rotation3D<PForwardBuffer, PBackwardBuffer> &rot) noexcept :
+		m_quaternion(rot.m_quaternion) { }
 	~Rotation3D() = default;
+
+	RotationSettings3DQuat quaternionSettings() const noexcept {
+		return RotationSettings3DQuat(m_quaternion);
+	}
+	RotationSettings3DEuler eulerSettings() const noexcept {
+		return RotationSettings3DEuler(); // TODO
+	}
 
 	void set(float roll, float pitch, float yaw) {
 		m_quaternion = quat({roll, pitch, yaw});
@@ -530,6 +610,9 @@ class Translation2D :
 	public ViewTransformer,
 	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
 public:
+	using ThisType = Translation2D<ForwardBuffer, BackwardBuffer>;
+	using Translation2DType = ThisType;
+
 	using TypeMatrixBuffer = MatrixBuffer<ForwardBuffer, BackwardBuffer>;
 
 protected:
@@ -537,11 +620,11 @@ protected:
 
 	mat4x4 translationMatrix() const noexcept {
 		return TypeMatrixBuffer::forwardBufferOrMatrix(
-			[this]() { glm::translate(mat4x4(1.0f), vec3(m_translation, 0.0f)); });
+			[this]() { return glm::translate(mat4x4(1.0f), vec3(m_translation, 0.0f)); });
 	}
 	mat4x4 inverseTranslationMatrix() const noexcept {
 		return TypeMatrixBuffer::backwardBufferOrMatrix(
-			[this]() { glm::translate(mat4x4(1.0f), vec3(-m_translation, 0.0f)); });
+			[this]() { return glm::translate(mat4x4(1.0f), vec3(-m_translation, 0.0f)); });
 	}
 public:
 	Translation2D() noexcept : m_translation(0.0f) { }
@@ -588,12 +671,12 @@ protected:
 
 	mat4x4 rotationMatrix() const noexcept {
 		return TypeMatrixBuffer::forwardBufferOrMatrix(
-			[this]() { glm::rotate(m_rotation, vec3{0.0f, 1.0f, 0.0f}); });
+			[this]() { return glm::rotate(m_rotation, vec3{0.0f, 1.0f, 0.0f}); });
 	}
 
 	mat4x4 inverseRotationMatrix() const noexcept {
 		return TypeMatrixBuffer::forwardBufferOrMatrix(
-			[this]() { glm::rotate(-m_rotation, vec3{0.0f, 1.0f, 0.0f}); });
+			[this]() { return glm::rotate(-m_rotation, vec3{0.0f, 1.0f, 0.0f}); });
 	}
 
 public:
@@ -642,7 +725,7 @@ protected:
 
 public:
 	Scale3D() noexcept : m_scale(1.0f) { }
-	Scale3D(float x, float y, float z) noexcept : m_scale(x, y) { }
+	Scale3D(float x, float y, float z) noexcept : m_scale(x, y, z) { }
 	Scale3D(vec3 scale) noexcept : m_scale(scale) { }
 	virtual ~Scale3D() = default;
 
@@ -745,24 +828,34 @@ protected:
 	TypeRotation3D m_rotation;
 
 	template<typename Type>
-	void passthroughCamera3D(Type &val) {
-		m_projection.passthrough(val); // TODO check
+	void passthroughCamera3D(Type &val) const noexcept {
     	m_translation.passthrough(val);
     	m_rotation.passthrough(val);
+		m_projection.passthrough(val); // TODO check
 	}
 	template<typename Type>
-	void passthroughInverseCamera3D(Type &val) {
-		m_rotation.passthroughInverse(val); // TODO check
-    	m_translation.passthroughInverse(val);
+	void passthroughInverseCamera3D(Type &val) const noexcept {
     	m_projection.passthroughInverse(val);
+    	m_translation.passthroughInverse(val);
+		m_rotation.passthroughInverse(val); // TODO check
 	}
 
 public:
 	Camera3D() noexcept = default;
 	Camera3D(
-		const TypeProjection3D &projection,
-		const TypeTranslation3D &translation,
-		const TypeRotation3D &rotation);
+		const Projection3DSettings &projectionSettings,
+		const Translation3DSettings &translationSettings,
+		const RotationSettings3DEuler &rotationSettings) noexcept :
+		m_projection(projectionSettings),
+		m_translation(translationSettings),
+		m_rotation(rotationSettings) { }
+	Camera3D(
+		const Projection3DSettings &projectionSettings,
+		const Translation3DSettings &translationSettings,
+		const RotationSettings3DQuat &rotationSettings) noexcept :
+		m_projection(projectionSettings),
+		m_translation(translationSettings),
+		m_rotation(rotationSettings) { }
 
 	virtual ~Camera3D() = default;
 
@@ -778,7 +871,9 @@ public:
 	inline TypeTranslation3D& translation() noexcept { return m_translation; }
 	inline TypeRotation3D& rotation() noexcept { return m_rotation; }
 
-	virtual mat4x4 projectionMatrix() const noexcept override { return m_projection.matrix(); }
+	virtual mat4x4 projectionMatrix() const noexcept override {
+		return m_projection.matrix();
+	}
 	virtual mat4x4 viewMatrix() const noexcept override {
 		mat4x4 mat(1.0f);
 		m_translation.passthrough(mat); // TODO check
@@ -830,13 +925,13 @@ protected:
 	TypeScale2D m_scale;
 	
 	template<typename Type>
-	void passthroughCamera2D(Type &val) {
+	void passthroughCamera2D(Type &val) const noexcept {
 		m_scale.passthrough(val); // TODO check
     	m_rotation.passthrough(val);
     	m_translation.passthrough(val);
 	}
 	template<typename Type>
-	void passthroughInverseCamera2D(Type &val) {
+	void passthroughInverseCamera2D(Type &val) const noexcept {
 		m_translation.passthroughInverse(val); // TODO check
     	m_rotation.passthroughInverse(val);
     	m_scale.passthroughInverse(val);

@@ -539,7 +539,8 @@ namespace traffic
 		const OSMRelation& getRelation(int64_t id) const;
 
 		int64_t findClosestNode(float lat, float lon) const;
-
+		std::vector<std::vector<glm::vec2>> findBuildings() const;
+		
 		/// (1) Adds a new node to this map
 		/// (2) Adds a new way to this map
 		/// (3) Adds a new relation to this map

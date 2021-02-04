@@ -28,6 +28,7 @@
 
 #include <spdlog/spdlog.h>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 #include <limits>
 
@@ -98,11 +99,11 @@ void showInfoLog(GLuint program) {
 }
 
 void ShaderBase::cleanupParts(GLuint vertex_shader, GLuint fragment_shader) {
-    if ((flags & BIT_HAS_VERT_SHADER) && (flags && BIT_CREATED_VERT)) {
+    if ((flags & BIT_HAS_VERT_SHADER) && (flags & BIT_CREATED_VERT)) {
         CGL(glDeleteShader(vertex_shader));
         flags &= ~BIT_CREATED_VERT;
     }
-    if ((flags & BIT_HAS_FRAG_SHADER) && (flags && BIT_CREATED_FRAG)) {
+    if ((flags & BIT_HAS_FRAG_SHADER) && (flags & BIT_CREATED_FRAG)) {
         CGL(glDeleteShader(fragment_shader));
         flags &= ~BIT_CREATED_FRAG;
     }
@@ -205,7 +206,7 @@ void ShaderBase::release() {
 }
 
 bool ShaderBase::valid() {
-    return flags & BIT_LINKED != 0;
+    return (flags & BIT_LINKED) != 0;
 }
 
 void ShaderBase::loadFloat(GLint location, float value) { CGL(glUniform1f(location, value)); }
@@ -460,7 +461,7 @@ void SimpleMVPShader::loadMVPMatrix(const glm::mat4& mat) {
 PhongListStageBuffer::PhongListStageBuffer() :
     camera(std::make_shared<ViewPipeline>()),
     renderList(std::make_shared<RenderList<Entity>>()),
-    lightPosition({0.0f, 0.0f, 0.0f}),
+    lightPosition({100.0f, 50.0f, 60.0f}),
     lightColor({1.0f, 1.0f, 1.0f})
 { }
 PhongListStageBuffer::PhongListStageBuffer(
@@ -474,7 +475,7 @@ PhongListStageBuffer::PhongListStageBuffer(
 PhongBatchStageBuffer::PhongBatchStageBuffer() :
     camera(std::make_shared<ViewPipeline>()),
     renderList(std::make_shared<RenderBatch<Entity>>()),
-    lightPosition({0.0f, 0.0f, 0.0f}),
+    lightPosition({100.0f, 50.0f, 60.0f}),
     lightColor({1.0f, 1.0f, 1.0f})
 { }
 PhongBatchStageBuffer::PhongBatchStageBuffer(
@@ -514,17 +515,18 @@ PhongShader& PhongShader::operator=(PhongShader&& sh)
 }
 
 void PhongShader::initializeUniforms() {
-    uniformModelViewTransformPhong = uniformLocation("modelViewTransform");
-    uniformProjectionTransformPhong = uniformLocation("projectionTransform");
-    uniformNormalTransformPhong = uniformLocation("normalTransform");
-    uniformMaterialPhong = uniformLocation("material");
-    uniformLightPositionPhong = uniformLocation("lightPosition");
-    uniformLightColorPhong = uniformLocation("lightColor");
-    uniformColorPhong = uniformLocation("color");
+    bool required = false;
+    uniformModelViewTransformPhong = uniformLocation("modelViewTransform", required);
+    uniformProjectionTransformPhong = uniformLocation("projectionTransform", required);
+    uniformNormalTransformPhong = uniformLocation("normalTransform", required);
+    uniformMaterialPhong = uniformLocation("material", required);
+    uniformLightPositionPhong = uniformLocation("lightPosition", required);
+    uniformLightColorPhong = uniformLocation("lightColor", required);
+    uniformColorPhong = uniformLocation("color", required);
 
     //uniformUseNormalTexture = uniformLocation("useNormalTexture");
-    uniformUseTexture = uniformLocation("useTexture");
-    uniformTextureSamplerPhong = uniformLocation("textureSampler");
+    uniformUseTexture = uniformLocation("useTexture", required);
+    uniformTextureSamplerPhong = uniformLocation("textureSampler", required);
 }
 
 
@@ -537,17 +539,26 @@ void PhongShader::render(const ViewPipeline& camera, const RenderList<Entity>& l
     glEnable(GL_CULL_FACE);
     glActiveTexture(GL_TEXTURE0);
     // loads the uniforms that stay the same during drawcall
-    loadProjection(camera.projectionMatrix());
+    auto proj = camera.projectionMatrix();
+    loadProjection(proj);
+    //loadProjection(glm::mat4x4(1.0f));
     loadLightPosition(lightPosition);
     loadLightColor(lightColor);
     loadTexture(0);
 
-    glm::mat4x4 cam = camera.viewMatrix();
+    glm::mat4x4 cameraView = camera.viewMatrix();
+    cameraView = glm::lookAt(
+        glm::vec3{5.0f, 5.0f, 5.0f},
+        glm::vec3{0.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 1.0f, 0.0f});
     for (const auto& entity : list) {
         if (!entity->hasModel()) continue; // entities without model are skipped
         // loads the view transformations
-        loadModelView(cam * entity->getTransformationMatrix());
-        loadNormalMatrix(entity->getNormalMatrix());
+        glm::mat4x4 modelMatrix(1.0f);
+        glm::mat4x4 modelView = cameraView * modelMatrix;
+        glm::mat3x3 normalMatrix = glm::inverseTranspose(glm::mat3x3(modelMatrix));
+        loadModelView(modelView);
+        loadNormalMatrix(normalMatrix);
 
         // loads the entity material or uses a default one
         if (entity->hasMaterial())
@@ -556,7 +567,6 @@ void PhongShader::render(const ViewPipeline& camera, const RenderList<Entity>& l
             loadMaterial({0.5f, 0.5f, 0.5f, 5.0f});
         
         // 
-        loadHasTexture(entity->hasTexture());
         if (entity->hasTexture()) {
             entity->getTexture()->bind();
             loadHasTexture(true);
@@ -660,13 +670,18 @@ std::vector<char> PhongMemoryShader::retrieveVertexShader()
 
     void main()
     {
-        gl_Position  = projectionTransform * modelViewTransform * vec4(vertCoordinates_in, 1.0F);
+        vec4 vertPosition4D = modelViewTransform * vec4(vertCoordinates_in, 1.0F);
+        vec4 lightPosition4D = modelViewTransform * vec4(lightPosition, 1.0F);
+        vec3 normalVector = normalize(normalTransform * vertNormals_in);
+        
+        // pass the vertex position information to OpenGL
+        gl_Position  = projectionTransform * vertPosition4D;
 
         // Pass the required information to the fragment shader stage.
-        relativeLightPosition = vec3(modelViewTransform * vec4(lightPosition, 1.0F));
-        vertPosition = vec3(modelViewTransform * vec4(vertCoordinates_in, 1.0F));
-        vertNormal   = normalize(normalTransform * vertNormals_in);
-        texCoords    = texCoords_in;
+        relativeLightPosition = vec3(lightPosition4D);
+        vertPosition = vec3(vertPosition4D);
+        vertNormal = normalVector;
+        texCoords = texCoords_in;
     }
     )";
     return toArray(frag);
@@ -689,7 +704,7 @@ std::vector<char> PhongMemoryShader::retrieveFragmentShader()
     uniform vec3 color;
     uniform int useTexture;
 
-    // Texture sampler.
+    // Texture sampler.vertNormal
     uniform sampler2D textureSampler;
 
     // Specify the output of the fragment shader.
@@ -703,7 +718,6 @@ std::vector<char> PhongMemoryShader::retrieveFragmentShader()
             texColor = texture(textureSampler, texCoords).xyz;
         else
             texColor = color;
-        //texColor = vec3(0.5, 0.3, 0.5);
         vec3 color = material.x * texColor;
 
         // Calculate light direction vectors in the Phong illumination model.
@@ -719,7 +733,7 @@ std::vector<char> PhongMemoryShader::retrieveFragmentShader()
         vec3 reflectDirection = reflect(-lightDirection, normal);
         float specularIntensity = max(dot(reflectDirection, viewDirection), 0.0F);
         color += lightColor * material.z * pow(specularIntensity, material.w);
-
+        
         vertColor = vec4(color, 1.0F);
     }
     )";

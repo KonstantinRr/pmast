@@ -41,11 +41,23 @@ NYREM_NAMESPACE_BEGIN
 /// </summary>
 class FastSStream {
 public:
+	FastSStream();
+	FastSStream(size_t bufferSize, size_t stringBufferSize);
+
 	void add(const char *string);
 	void add(const char *string, size_t size);
 	void add(const std::string &string, bool lives=false);
 	void add(std::string &&string);
 	void add(char fill, size_t size);
+	void add(char fill);
+	
+	template<typename Type>
+	void add(const Type& tp) {
+		add(std::to_string(tp));
+	}
+
+	void reserve(size_t size);
+	void reserveStringBuffers(size_t size);
 
 	std::string generate() const;
 	void clear();
@@ -58,11 +70,27 @@ private:
 		TYPE_STRING,
 		TYPE_STRING_INDEX,
 		TYPE_CHAR,
-		TYPE_FILL
+		TYPE_FILL,
+		// signed integer types
+		TYPE_INTEGER_CHAR,
+		TYPE_INTEGER_SHORT,
+		TYPE_INTEGER_INT,
+		TYPE_INTEGER_LONG,
+		TYPE_INTEGER_LONG_LONG,
+		// unsigned integer types
+		TYPE_UINTEGER_CHAR,
+		TYPE_UINTEGER_SHORT,
+		TYPE_UINTEGER_INT,
+		TYPE_UINTEGER_LONG,
+		TYPE_UINTEGER_LONG_LONG,
+
+		TYPE_FLOAT,
+		TYPE_DOUBLE
 	};
 	
 	struct DataSegment {
 		union {
+
 			struct {
 				size_t size;
 				char fill;
@@ -71,7 +99,24 @@ private:
 				const char *data;
 				size_t size;
 			} u_char;
+			// signed integer types
+			char u_type_char;
+			short u_type_short;
+			int u_type_int;
+			long u_type_long;
+			long long u_type_long_long;
+			// unsigned integer types
+			unsigned char u_type_uchar;
+			unsigned short u_type_ushort;
+			unsigned int u_type_uint;
+			unsigned long u_type_ulong;
+			unsigned long long u_type_ulong_long;
+			// floating point types
+			float u_type_ufloat;
+			double u_type_udouble;
+			// external strings
 			const std::string *u_string;
+			// internal buffered strings
 			size_t u_index;
 		};
 		DataType type;
@@ -119,10 +164,10 @@ public:
 	BlockAllocator(size_t size) : 
 		m_maxSize(size), m_allocated(0) {
 		// allocates the block
-		m_data = new Block[maxSize];
+		m_data = new Block[m_maxSize];
 		// initializes the pointers to the first and last element
 		m_first = m_data;
-		Block *last = m_data + maxSize - 1;
+		Block *last = m_data + m_maxSize - 1;
 		// all elements point to the next element
 		for (Block *ptr = m_first; ptr != last; ptr++)
 			ptr->next = ptr + 1;
@@ -149,7 +194,7 @@ public:
 
 	void deallocate(Type *ptr) {
 		Block *original = reinterpret_cast<Block*>(ptr);
-		if (original >= m_data && original < m_data + maxSize) {
+		if (original >= m_data && original < m_data + m_maxSize) {
 			// check if the ptr actually belongs to this block of memory
 			Block* tempFirst = m_first;
 			m_first = original;

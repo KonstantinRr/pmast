@@ -138,6 +138,10 @@ NYREM_NAMESPACE_BEGIN
 	using dvec2 = glm::dvec2;
     
     using quat = glm::quat;
+    template <typename S, typename... Args, typename Char = char>
+    std::basic_string<Char> format(const S& format_str, Args&&... args) {
+        return fmt::format<S, Args..., Char>(format_str, std::forward<Args>(args)...);
+    }
 
 NYREM_NAMESPACE_END
 

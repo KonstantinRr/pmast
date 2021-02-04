@@ -62,9 +62,6 @@ int main(int argc, char** argv)
     auto manager = std::make_shared<ConcurrencyManager>();
 	auto world = std::make_shared<World>(manager.get());
 
-	auto m_canvas = std::make_shared<MapCanvas>(world->getMap());
-	m_canvas->setAgentList(world->getAgents());
-	auto map_world = std::make_shared<MapWorld>();
 	// Loads the default map
 	bool loadDefault = true;
 	if (loadDefault) {
@@ -79,13 +76,15 @@ int main(int argc, char** argv)
 		timings.summary();
 		
 		*newMap = newMap->findSquareNodes(initRect);
-
 		world->loadMap(newMap);
-		
-		m_canvas->loadMap(world->getMap());
-		m_canvas->loadHighwayMap(world->getHighwayMap());
-		spdlog::info(m_canvas->info());
 	}
+	auto m_canvas = std::make_shared<MapCanvas>(
+		world->getMap(), world->getHighwayMap());
+	auto map_world = std::make_shared<MapWorld>(
+		world->getMap(), world->getHighwayMap());
+	m_canvas->setAgentList(world->getAgents());
+
+	spdlog::info(m_canvas->info());
 
 	InputHandler &input = eng.input();
 
@@ -210,12 +209,21 @@ int main(int argc, char** argv)
 	a.b();
 
 	// 2, 2, 3, 3 1
-	GenericVertex<float,
-		VertexComponent2D, TextureComponent2D,
-		VertexComponent3D, NormalComponent3D> x;
-	
-	bool v = x.hasType<VertexComponent2D>();
-	std::cout << sizeof(x) << " " << v << " " << "HELLO" << std::endl;
+	using VType = GenericVertex<
+		TextureComponent2DFloat,
+		VertexComponent3DFloat, NormalComponent3DFloat>;
+	VType x;
+	std::vector<VType> vec;
+	using TrianlgeType = Triangle<float, TextureComponent2DFloat, VertexComponent2DFloat, VertexComponent3DFloat>;
+	TrianlgeType tri;
+	std::cout << "Area: " << tri.area() << " Use 3D " << TrianlgeType::use3D << " Use 2D " << TrianlgeType::use2D << " Loc V2 " <<
+		TrianlgeType::VComponentType::locVertex2D << " LocV3 " << TrianlgeType::VComponentType::locVertex3D << std::endl;
+
+	constexpr int loc = VType::componentIndex<VertexComponent3DFloat>();
+
+	bool v = x.hasComponent<VertexComponent2DFloat>();
+	x.component<VertexComponent3DFloat>() = vec3(2.0f);
+	std::cout << sizeof(x) << " " << v << " " << loc << " " << "HELLO " << x.component<VertexComponent3DFloat>().get().x << std::endl;
 
     eng.setPipeline(m_canvas.get());
     eng.mainloop();
