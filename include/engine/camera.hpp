@@ -477,6 +477,11 @@ public:
 		TypeMatrixBuffer::makeDirty();
 	}
 
+	void move(vec3 position) {
+		m_settings.translation += position;
+		TypeMatrixBuffer::makeDirty();
+	}
+
 	virtual mat4x4 matrix() const noexcept override { return translationMatrix(); }
 	virtual mat4x4 inverse() const noexcept override { return inverseTranslationMatrix(); }
 	
@@ -543,6 +548,7 @@ public:
 	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
 
 protected:
+	static constexpr vec3 up = {0.0f, 1.0f, 0.0f};
 	quat m_quaternion;
 
 	mat4x4 rotationMatrix() const noexcept {
@@ -565,6 +571,17 @@ public:
 	Rotation3D(const Rotation3D<PForwardBuffer, PBackwardBuffer> &rot) noexcept :
 		m_quaternion(rot.m_quaternion) { }
 	~Rotation3D() = default;
+
+	vec3 viewDirection() const noexcept {
+		return m_quaternion * vec3(-1.0f, 0.0f, 0.0f);
+	}
+
+	vec3 sideDirection() const noexcept {
+		return m_quaternion * vec3(0.0f, 0.0f, 1.0f);
+	}
+	vec3 upDirection() const noexcept {
+		return m_quaternion * vec3(0.0f, 1.0f, 0.0f);
+	}
 
 	RotationSettings3DQuat quaternionSettings() const noexcept {
 		return RotationSettings3DQuat(m_quaternion);
@@ -862,6 +879,32 @@ public:
 	// ---- Complex Functions ---- //
 	void lookAt(const vec3 &pos, const vec3 &dest, const vec3 &up) noexcept;
 
+	inline vec3 viewDirection() const noexcept { return m_rotation.viewDirection(); }
+	inline vec3 sideDirection() const noexcept { return m_rotation.sideDirection(); }
+	inline vec3 upDirection() const noexcept { return m_rotation.upDirection(); }
+	
+	void moveForward(float distance) {
+		m_translation.move(distance * viewDirection());
+	}
+
+	void moveBackward(float distance) {
+		return moveForward(-distance);
+	}
+	void moveUp(float distance) {
+		m_translation.move(distance * upDirection()); 
+	}
+	void moveDown(float distance) {
+		moveUp(-distance);
+	}
+
+	void moveLeft(float distance) {
+		m_translation.move(distance * sideDirection());
+	}
+
+	void moveRight(float distance) {
+		return moveLeft(-distance);
+	}
+
 	// ---- Const access modifiers ---- //
 	inline const TypeProjection3D& projection() const noexcept { return m_projection; }
 	inline const TypeTranslation3D& translation() const noexcept { return m_translation; }
@@ -876,8 +919,8 @@ public:
 	}
 	virtual mat4x4 viewMatrix() const noexcept override {
 		mat4x4 mat(1.0f);
-		m_translation.passthrough(mat); // TODO check
 		m_rotation.passthrough(mat);
+		m_translation.passthroughInverse(mat); // TODO check
 		return mat;
 	}
 

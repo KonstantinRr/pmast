@@ -60,7 +60,7 @@
 using float32 = float;
 using float64 = double;
 
-using prec_t = float;
+using prec_t = double;
 using map_index_t = uint32_t;
 using map_t = robin_hood::unordered_flat_map<int64_t, map_index_t>;
 using chunkmap_t = robin_hood::unordered_flat_map<int64_t, map_index_t>;

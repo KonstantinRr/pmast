@@ -744,7 +744,7 @@ struct ExportFile {
     ExportFile(ExportFile&&) = default;
         
     std::string info() const;
-    std::string detail(char seperator='\t', bool separateSegments=true) const;
+    std::string detail(int max=1000, char seperator='\t', bool separateSegments=true) const;
 
     ExportFile& operator=(const ExportFile&) = delete;
     ExportFile& operator=(ExportFile &&) = default;
@@ -865,6 +865,8 @@ public:
         colors.insert(colors.end(), begin, end);
         return *this;
     }
+
+    MeshBuilder2D& invertWinding(bool indexed) noexcept;
 
     MeshBuilder2D& addMesh(const MeshBuilder2D &mesh) noexcept;
     MeshBuilder2D& addCircle(size_t pcount, float radius, bool strip=false);
@@ -1078,26 +1080,31 @@ public:
         return *this;
     }
 
+    MeshBuilder& invertWinding(bool indexed) noexcept;
+
     template<typename Iterator>
     MeshBuilder& addVerticeIndices(Iterator begin, Iterator end) {
-        addIndices<Iterator>(v_indices, begin, end);
+        return addIndices<Iterator>(v_indices, begin, end);
     }
     template<typename Iterator>
     MeshBuilder& addNormalIndices(Iterator begin, Iterator end) {
-        addIndices<Iterator>(vn_indices, begin, end);
+        return addIndices<Iterator>(vn_indices, begin, end);
     }
     template<typename Iterator>
     MeshBuilder& addTextureIndices(Iterator begin, Iterator end) {
-        addIndices<Iterator>(vt_indices, begin, end);
+        return addIndices<Iterator>(vt_indices, begin, end);
     }
     template<typename Iterator>
     MeshBuilder& addColorIndices(Iterator begin, Iterator end) {
-        addIndices<Iterator>(vc_indices, begin, end);
+        return addIndices<Iterator>(vc_indices, begin, end);
     }
 
 
-    void add(const MeshBuilder2D &mesh, float height = 0.0f,
+    MeshBuilder& add(const MeshBuilder2D &mesh, float height = 0.0f, bool up=true,
         bool srcIndex=false, bool dstIndex=false) noexcept;
+    MeshBuilder& add(const MeshBuilder &mesh) noexcept;
+
+    std::string info() const noexcept;
 
     void scale(float scale);
     void unitize(float unitScale=1.0f);

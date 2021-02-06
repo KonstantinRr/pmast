@@ -39,10 +39,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-
 namespace traffic {
 	
-
 class Agent; // externally defined Agent class
 class Route; // externally defined Route class
 
@@ -51,17 +49,19 @@ class Route; // externally defined Route class
 /// OpenGL shaders to render a mesh of the map dynamically on the screen. It offers
 /// some functions to manipulate the view matrix (zoom, rotation, translation).
 /// </summary>
-class MapCanvas : public nyrem::Renderable {
+class MapCanvas : public nyrem::EngineStage {
 public:
 	MapCanvas(
-		const std::shared_ptr<traffic::OSMSegment> &map,
-		const std::shared_ptr<traffic::OSMSegment> &highway);
+		const std::shared_ptr<nyrem::Engine> &engine,
+		const std::shared_ptr<traffic::World> &world);
+
+	virtual ~MapCanvas() = default;
 
 	inline nyrem::RenderPipeline& getPipeline() {
 		return l_pipeline;
 	}
 
-	virtual void render(const nyrem::RenderContext &context);
+	virtual void render(const nyrem::RenderContext &context) override;
 
 	// ---- Position updates ---- //
 	void setLatitude(double lat);
@@ -143,7 +143,10 @@ public:
 
 	void setAgentList(const std::vector<Agent> &agentList);
 
+	virtual void activate(nyrem::Navigator &nav) override;
+	virtual void deactivate(nyrem::Navigator &nav) override;
 protected:
+
 	// ---- Mesh access ---- //
 	/// <summary>Clears the currently used mesh</summary>
 	void clearMesh();
@@ -158,6 +161,8 @@ protected:
 		const std::vector<glm::vec2>& points);
 
 	// ---- Member variables ---- //
+	std::shared_ptr<World> m_world;
+	std::shared_ptr<nyrem::Engine> m_engine;
 
 	nyrem::Listener<void(glm::dvec2)> m_cb_leftclick;		// triggered on left click
 	nyrem::Listener<void(glm::dvec2)> m_cb_rightclick;		// triggered on right clcik
@@ -166,6 +171,11 @@ protected:
 	nyrem::Listener<void(traffic::Rect)> m_cb_view_changed; // triggered if view changes
 	nyrem::Listener<void(double)> m_cb_zoom_changed;		// triggered if zoom changes
 	nyrem::Listener<void(double)> m_cb_rotation_changed;	// triggered if rotation changes
+
+	nyrem::CallbackReturn<void(nyrem::KeyEvent)> m_key_p, m_key_o,
+		m_key_k, m_key_l, m_key_left, m_key_right,
+		m_key_up, m_key_down, m_key_g, m_key_r, m_key_t,
+		m_key_enter, m_key_h; 
 
 	// contains the overall map mesh as well as the highway mesh
 	std::shared_ptr<nyrem::TransformedEntity2D> l_mesh_map, l_mesh_highway;
@@ -199,7 +209,16 @@ protected:
 
 	double m_max_zoom;
 	double m_min_zoom;
-};
 
+    static constexpr double rotateSpeed = 0.01;
+	static constexpr double translateSpeed = 0.015;
+	static constexpr double zoomSpeed = 1.5;
+
+    bool hasStart = false;
+	bool hasEnd = false;
+    glm::dvec2 start{ 0.0 };
+	glm::dvec2 end{ 0.0 };
+};
 }
+
 #endif

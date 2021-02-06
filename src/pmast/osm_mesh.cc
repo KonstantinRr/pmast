@@ -24,7 +24,6 @@
 /// July 2020
 
 #include <pmast/osm.hpp>
-#include <pmast/agent.hpp>
 #include <pmast/osm_mesh.hpp>
 #include <pmast/osm_graph.hpp>
 #include <pmast/geom.hpp>
@@ -163,31 +162,6 @@ std::vector<vec2> traffic::generateMesh(const OSMSegment& map)
 		applyNodes(wd.getNodes(), map, points);
 
 	return points;
-}
-
-std::vector<vec2> traffic::generateChunkMesh(const World& world)
-{
-	std::vector<vec2> positions;
-	vec2 center = world.getMap()->getBoundingBox().getCenter().toVec();
-	/* // TODO
-	for (const WorldChunk& chunk : world.getChunks())
-	{
-		const Rect box = chunk.getBoundingBox();
-
-		positions.push_back(sphereToPlane(box.latLlonL().toVec(), center));
-		positions.push_back(sphereToPlane(box.latLlonH().toVec(), center));
-
-		positions.push_back(sphereToPlane(box.latLlonL().toVec(), center));
-		positions.push_back(sphereToPlane(box.latHlonL().toVec(), center));
-
-		positions.push_back(sphereToPlane(box.latHlonH().toVec(), center));
-		positions.push_back(sphereToPlane(box.latHlonL().toVec(), center));
-
-		positions.push_back(sphereToPlane(box.latHlonH().toVec(), center));
-		positions.push_back(sphereToPlane(box.latLlonH().toVec(), center));
-	}
-	*/
-	return positions;
 }
 
 std::vector<glm::vec2> traffic::generateRouteMesh(const Route route, const OSMSegment& map)

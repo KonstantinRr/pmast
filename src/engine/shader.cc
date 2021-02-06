@@ -529,6 +529,15 @@ void PhongShader::initializeUniforms() {
     uniformTextureSamplerPhong = uniformLocation("textureSampler", required);
 }
 
+void printMatrix(glm::mat4x4 &mat) {
+    std::cout << "Matrix 4x4:\n";
+    for (size_t x = 0; x < 4; x++) {
+        for (size_t y = 0; y < 4; y++) {
+            std::cout << mat[x][y] << "\t";
+        }
+        std::cout << std::endl;
+    }
+}
 
 void PhongShader::render(const ViewPipeline& camera, const RenderList<Entity>& list,
     const glm::vec3& lightPosition, const glm::vec3& lightColor)
@@ -547,10 +556,6 @@ void PhongShader::render(const ViewPipeline& camera, const RenderList<Entity>& l
     loadTexture(0);
 
     glm::mat4x4 cameraView = camera.viewMatrix();
-    cameraView = glm::lookAt(
-        glm::vec3{5.0f, 5.0f, 5.0f},
-        glm::vec3{0.0f, 0.0f, 0.0f},
-        glm::vec3{0.0f, 1.0f, 0.0f});
     for (const auto& entity : list) {
         if (!entity->hasModel()) continue; // entities without model are skipped
         // loads the view transformations
@@ -654,7 +659,7 @@ std::vector<char> PhongMemoryShader::retrieveVertexShader()
     // Specify the input locations of attributes.
     layout (location = 0) in vec3 vertCoordinates_in;
     layout (location = 1) in vec3 vertNormals_in;
-    layout (location = 2) in vec2 texCoords_in;
+    //layout (location = 2) in vec2 texCoords_in;
 
     // Specify the uniforms of the vertex shader.
     uniform mat4 modelViewTransform;
@@ -681,7 +686,8 @@ std::vector<char> PhongMemoryShader::retrieveVertexShader()
         relativeLightPosition = vec3(lightPosition4D);
         vertPosition = vec3(vertPosition4D);
         vertNormal = normalVector;
-        texCoords = texCoords_in;
+        //texCoords = texCoords_in;
+        texCoords = vec2(1.0, 1.0);
     }
     )";
     return toArray(frag);

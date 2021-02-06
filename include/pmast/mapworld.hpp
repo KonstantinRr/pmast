@@ -29,40 +29,53 @@
 #define MAPWORLD_HPP
 
 #include <pmast/internal.hpp>
-#include <pmast/agent.hpp>
-#include <pmast/osm.hpp>
-
 #include <engine/listener.hpp>
 #include <engine/shader.hpp>
 #include <engine/window.hpp>
 
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-
 namespace traffic {
 
-class MapWorld : public nyrem::Renderable {
+class World;
+class OSMSegment;
+
+class MapWorld : public nyrem::EngineStage {
 public:
     MapWorld(
-        const std::shared_ptr<traffic::OSMSegment> &map,
-        const std::shared_ptr<traffic::OSMSegment> &highwayMap);
+        const std::shared_ptr<nyrem::Engine> &engine,
+		const std::shared_ptr<traffic::World> &world);
+
+    void loadWorld(const std::shared_ptr<traffic::OSMSegment> &map) noexcept;
+    void loadHighway(const std::shared_ptr<traffic::OSMSegment> &highwayMap) noexcept;
+    void createKeyBindings();
 
     virtual void render(const nyrem::RenderContext &context) override;
 
+    virtual void activate(nyrem::Navigator &nav) override;
+    virtual void deactivate(nyrem::Navigator &nav) override;
 protected:
-    std::shared_ptr<traffic::OSMSegment> m_highwayMap;
-    std::shared_ptr<traffic::OSMSegment> m_map;
+    static constexpr float cameraSpeedLeft = 0.01f;
+    static constexpr float cameraSpeedForward = 0.01f;
+    static constexpr float cameraSpeedUp = 0.01f;
+    std::vector<std::shared_ptr<nyrem::GLModel>> models;
 
     nyrem::RenderPipeline m_pipeline;
+
+    std::shared_ptr<nyrem::Engine> m_engine;
+    std::shared_ptr<World> m_world;
 
     std::shared_ptr<nyrem::RenderList<nyrem::Entity>> m_entities;
     std::shared_ptr<nyrem::Camera3D<>> m_camera;
     std::shared_ptr<nyrem::PhongShader> m_shader;
     std::shared_ptr<nyrem::PhongListStage> m_shader_stage;
+
+    nyrem::CallbackReturn<void(nyrem::KeyEvent)> m_key_w,
+        m_key_s, m_key_a, m_key_d, m_key_g,
+        m_key_space, m_key_shift;
 };
 
-
 }
-
 #endif

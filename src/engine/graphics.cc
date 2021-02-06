@@ -144,10 +144,10 @@ int64_t ImgCircle::getRadiusY() const { return radiusy_; }
 
 bool ImgCircle::contains(ImgPoint point) const {
 	ImgPoint dist = point - ImgDistance(center_);
-	prec_t doubleX = static_cast<prec_t>(dist.getX());
-	prec_t doubleY = static_cast<prec_t>(dist.getY());
-	prec_t doubleRadiusX = static_cast<prec_t>(radiusx_);
-	prec_t doubleRadiusY = static_cast<prec_t>(radiusy_);
+	nprec_t doubleX = static_cast<nprec_t>(dist.getX());
+	nprec_t doubleY = static_cast<nprec_t>(dist.getY());
+	nprec_t doubleRadiusX = static_cast<nprec_t>(radiusx_);
+	nprec_t doubleRadiusY = static_cast<nprec_t>(radiusy_);
 	return
 		(doubleX * doubleX) / (doubleRadiusX * doubleRadiusX) +
 		(doubleY * doubleY) / (doubleRadiusY * doubleRadiusY) <= 1;
@@ -272,7 +272,7 @@ int64_t ImgDistance::getLengthSquared() const {
 	return dx * dx + dy * dy;
 }
 
-prec_t ImgDistance::getLength() const {
+nprec_t ImgDistance::getLength() const {
 	return sqrt(dx * dx + dy * dy);
 }
 
@@ -326,7 +326,7 @@ Image<Pixel, Value> Image<Pixel, Value>::ant(size_t aa)
 					//color += get(x + ax, y + ay).toColor();
 				}
 			}
-			color /= static_cast<prec_t>(aaScale);
+			color /= static_cast<nprec_t>(aaScale);
 			newImg.set(color, newx, newy);
 		}
 	}
@@ -401,20 +401,20 @@ void Image<Pixel, Value>::drawLine(
 	const ImgPoint& x2,
 	Color color,
 	int32_t radius,
-	prec_t accuracy
+	nprec_t accuracy
 ) {
 	// Calculates the distence between the points
 	ImgDistance dist(x2, x1);
-	prec_t length = dist.getLength();
+	nprec_t length = dist.getLength();
 
-	prec_t acc = accuracy * length;
-	prec_t dx = static_cast<prec_t>(dist.getDX()) / acc;
-	prec_t dy = static_cast<prec_t>(dist.getDY()) / acc;
+	nprec_t acc = accuracy * length;
+	nprec_t dx = static_cast<nprec_t>(dist.getDX()) / acc;
+	nprec_t dy = static_cast<nprec_t>(dist.getDY()) / acc;
 	size_t amount = static_cast<size_t>(acc);
 
 	// moves the position across the line
-	prec_t cx = static_cast<prec_t>(x1.getX());
-	prec_t cy = static_cast<prec_t>(x1.getY());
+	nprec_t cx = static_cast<nprec_t>(x1.getX());
+	nprec_t cy = static_cast<nprec_t>(x1.getY());
 	for (size_t i = 0; i < amount; i++) {
 		drawCircle(ImgCircle(radius, radius,
 			ImgPoint(

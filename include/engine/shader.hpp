@@ -44,7 +44,25 @@ NYREM_NAMESPACE_BEGIN
 class RenderContext {
 	size_t w, h;
 	float s;
+
+	void* objectList[16] = { nullptr };
 public:
+	static constexpr int getSize() { return 16; }
+
+	template<typename Type>
+	Type* get(size_t idx, bool required = true) const {
+		if (required && objectList[idx] == nullptr)
+			throw std::runtime_error("Empty container");
+		return static_cast<Type*>(objectList[idx]);
+	}
+
+	inline void store(size_t idx, void *obj) {
+		objectList[idx] = obj;
+	}
+	inline bool has(size_t idx) const {
+		return objectList[idx] != nullptr;
+	}
+
 	RenderContext() = default;
 	RenderContext(size_t w, size_t h, float s);
 

@@ -36,7 +36,7 @@
 
 NYREM_NAMESPACE_BEGIN
 
-using prec_t = float;
+using nprec_t = float;
 
 /// The general color type that encodes colors using
 /// floating value types.
@@ -181,7 +181,7 @@ T clamp(T v, T lower, T upper) {
 /// Color32:	uint32_t: [0:2^32-1]
 /// Color64:	uint64_t: [0:2^64-1]
 /// Colorf32:	sfloat_t: +-1.18x10^-38 to +-3.4x10^38
-/// Colorf64:	prec_t: +-2.23x10^-308 to +-1.80x10^308
+/// Colorf64:	nprec_t: +-2.23x10^-308 to +-1.80x10^308
 /// Colors are represented in RGB format. Other color
 /// formats are currently not supported but will probably
 /// be supported in the near future.
@@ -493,7 +493,7 @@ public:
 
 	/* Returns the pythogoras length of this ImgDistance */
 	int64_t getLengthSquared() const;
-	prec_t getLength() const;
+	nprec_t getLength() const;
 
 };
 
@@ -538,20 +538,20 @@ protected:
 
 public:
 	/// Creates that most tightly encloses the given values
-	/// prec_t lowerLat: Lower latitude boundary
-	/// prec_t upperLat: Upper latitude boundary
-	/// prec_t lowerLon: Lower longitude boundary
-	/// prec_t upperLon: Upper longitude boundary
+	/// nprec_t lowerLat: Lower latitude boundary
+	/// nprec_t upperLat: Upper latitude boundary
+	/// nprec_t lowerLon: Lower longitude boundary
+	/// nprec_t upperLon: Upper longitude boundary
 	static ImgRect fromBorders(int64_t lowerLat, int64_t upperLat, int64_t lowerLon, int64_t upperLon);
 	/// Creates a rect from a center point and the distances from
 	/// the center to the sides.
 	/// Point center: Center point of this rect
-	/// prec_t latLength: Distance from the center to the latitude border
-	/// prec_t lonLength: Distance from the center to the longitude border
+	/// nprec_t latLength: Distance from the center to the latitude border
+	/// nprec_t lonLength: Distance from the center to the longitude border
 	static ImgRect fromCenter(ImgPoint center, int64_t latLength, int64_t lonLength);
 	/// Creates a rect from a center point and the distances from
 	/// the center to the sides. This function has the same logic as
-	/// fromCenter(Point, prec_t, prec_t)
+	/// fromCenter(Point, nprec_t, nprec_t)
 	static ImgRect fromCenter(int64_t centerLat, int64_t centerLon, int64_t latLength, int64_t lonLength);
 	/// Creates a rect that most tightly encloses a circle.
 	static ImgRect fromCircle(const ImgCircle& circle);
@@ -709,7 +709,7 @@ public:
 
 	void drawRect(ImgRect x1, Color color);
 	void drawCircle(ImgCircle circle, Color color);
-	void drawLine(const ImgPoint &x1, const ImgPoint &x2, Color color, int32_t radius, prec_t accuracy);
+	void drawLine(const ImgPoint &x1, const ImgPoint &x2, Color color, int32_t radius, nprec_t accuracy);
 
 	void set(const Color &color);
 	void set(const Color &value, size_t index);

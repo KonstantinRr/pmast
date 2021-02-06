@@ -471,11 +471,13 @@ OSMSegment traffic::parseXMLMap(const ParseArguments &args)
 	// Parses some special nodes
 	// 1. The OSM node is the root of the document.
 	// 2. The meta data node describes some meta data.
+	constexpr bool requiresOSM = true;
+	constexpr bool requiresMeta = false;
 	info.osm_node = info.doc.first_node("osm");
-	if (info.osm_node == nullptr)
+	if (info.osm_node == nullptr && requiresOSM)
 		throw runtime_error("Could not find root node 'osm'\n");
 	info.meta_node = info.osm_node->first_node("meta");
-	if (info.meta_node == nullptr)
+	if (info.meta_node == nullptr && requiresMeta)
 		throw runtime_error("Could not find root node 'meta'\n");
 
 

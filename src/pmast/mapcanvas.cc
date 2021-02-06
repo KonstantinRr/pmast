@@ -40,13 +40,17 @@ using namespace glm;
 
 
 MapCanvas::MapCanvas(
-	const std::shared_ptr<OSMSegment> &world,
-	const std::shared_ptr<traffic::OSMSegment> &highway)
-	: m_min_zoom(2.0), m_max_zoom(1000.0)
+	const std::shared_ptr<nyrem::Engine> &engine,
+	const std::shared_ptr<traffic::World> &world)
 {
 	try {
-		loadMap(world);
-		loadHighwayMap(highway);
+		m_min_zoom = 2.0;
+		m_max_zoom = 1000.0;
+		m_world = world;
+		m_engine = engine;
+
+		loadMap(m_world->getMap());
+		loadHighwayMap(m_world->getHighwayMap());
 		resetView();
 
 		using namespace nyrem; // is used a lot
@@ -75,21 +79,18 @@ MapCanvas::MapCanvas(
 
 // ---- Apply Changes ---- //
 
-void MapCanvas::applyTranslation(glm::dvec2 rel)
-{
+void MapCanvas::applyTranslation(glm::dvec2 rel) {
 	glm::dvec2 mx = glm::rotate(rel / m_zoom, -m_rotation);
 	setPosition(position - mx);
 }
 
-void MapCanvas::applyZoom(double iterations)
-{
+void MapCanvas::applyZoom(double iterations) {
 	double scale = pow(0.99, iterations);
 	double clamped = std::clamp(m_zoom * scale, m_min_zoom, m_max_zoom);
 	setZoom(clamped);
 }
 
-void MapCanvas::applyRotation(double radians)
-{
+void MapCanvas::applyRotation(double radians) {
 	setRotation(m_rotation + radians);
 }
 
@@ -377,7 +378,8 @@ Rect MapCanvas::rect() const {
 }
 
 std::string MapCanvas::info() {
-	return fmt::format("MapCanvas Object\n"
+	return fmt::format(
+		"MapCanvas Object\n"
 		"\tposition: {} {}\n"
 		"\tcursor:   {} {}\n"
 		"\trotation: {}\n"
@@ -387,6 +389,113 @@ std::string MapCanvas::info() {
 		cursor.x, cursor.y,
 		m_rotation, m_zoom,
 		rect().summary());
+}
+
+void MapCanvas::activate(nyrem::Navigator &nav)
+{
+	using namespace nyrem;	
+	using namespace nyrem::keys;
+	using namespace nyrem::mouse;
+
+	InputHandler& m_input = m_engine->input();
+	m_key_p = m_input.loopKey(NYREM_KEY_P).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyZoom(zoomSpeed);
+	});
+	m_key_o = m_input.loopKey(NYREM_KEY_O).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyZoom(-zoomSpeed);
+	});
+
+	m_key_k = m_input.loopKey(NYREM_KEY_K).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyRotation(rotateSpeed);
+	});
+	m_key_l = m_input.loopKey(NYREM_KEY_L).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyRotation(-rotateSpeed);
+	});
+
+
+	m_key_left = m_input.loopKey(NYREM_KEY_LEFT).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyTranslation({translateSpeed, 0.0});
+	});
+	m_key_right = m_input.loopKey(NYREM_KEY_RIGHT).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyTranslation({-translateSpeed, 0.0});
+	});
+	m_key_up = m_input.loopKey(NYREM_KEY_UP).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyTranslation({0.0, -translateSpeed});
+	});
+	m_key_down = m_input.loopKey(NYREM_KEY_DOWN).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED)
+			applyTranslation({0.0, translateSpeed});
+	});
+
+	m_key_g = m_input.callbackKey(NYREM_KEY_G).listen(true, [this, &nav](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED) {
+			nav.pushReplacementNamed("world");
+		}
+	});
+
+	m_key_r = m_input.callbackKey(NYREM_KEY_R).listen(true, [&m_input, this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED) {
+			start = windowToPosition(
+				{m_input.cursorX(), m_input.cursorY()});
+			hasStart = true;
+			spdlog::info("Set Start {} {}", start.x, start.y);
+		}
+	});
+	m_key_t = m_input.callbackKey(NYREM_KEY_T).listen(true, [&m_input, this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED) {
+			end = windowToPosition(
+				{m_input.cursorX(), m_input.cursorY()});
+			hasEnd = true;
+			spdlog::info("Set End {} {}", end.x, end.y);
+		}
+	});
+	m_key_enter = m_input.callbackKey(NYREM_KEY_ENTER).listen(true, [this](KeyEvent e) {
+		std::cout << "ENTER IS PRESSED" << hasStart << " " << hasEnd << std::endl;
+		if (e.action == KEYSTATUS_PRESSED && hasStart && hasEnd) {
+			auto &traffic = m_world->getTrafficGraph();
+			TrafficGraphNodeIndex idStart = traffic->findClosestNodeIdx(Point(start.x, start.y));
+			TrafficGraphNodeIndex idStop = traffic->findClosestNodeIdx(Point(end.x, end.y));
+			std::cout << "Searching route from " << idStart << " " << idStop << "\n";
+
+			Route r = traffic->findRoute(idStart, idStop);
+			for (int64_t id : r.nodes) {
+				std::cout << "Node: " << id << "\n";
+			}
+			loadRoute(r, m_world->getHighwayMap());
+		}
+	});
+	m_key_h = m_input.callbackKey(NYREM_KEY_H).listen(true, [this](KeyEvent e) {
+		if (e.action == KEYSTATUS_PRESSED && hasStart && hasEnd) {
+			auto &traffic = m_world->getTrafficGraph();
+			TrafficGraphNodeIndex idStart = traffic->findClosestNodeIdx(Point(start.x, start.y));
+			TrafficGraphNodeIndex idStop = traffic->findClosestNodeIdx(Point(end.x, end.y));
+			std::cout << "Creating agent at " << idStart << " to " << idStop << "\n";
+			m_world->createAgent(idStart, idStop);
+		}
+	});
+}
+
+void MapCanvas::deactivate(nyrem::Navigator &nav)
+{
+	m_key_p.remove();
+	m_key_o.remove();
+	m_key_k.remove();
+	m_key_l.remove();
+	m_key_left.remove();
+	m_key_right.remove(),
+	m_key_up.remove();
+	m_key_down.remove();
+	m_key_r.remove();
+	m_key_t.remove(),
+	m_key_enter.remove();
+	m_key_h.remove();
 }
 
 void traffic::MapCanvas::setAgentList(const std::vector<Agent>& agentList)

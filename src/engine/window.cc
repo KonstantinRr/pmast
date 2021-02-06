@@ -31,9 +31,6 @@
 #include <glad/glad.h>
 
 #include <spdlog/spdlog.h>
-#include <unordered_map>
-#include <unordered_set>
-
 NYREM_USE_NAMESPACE
 
 // Maps each window to an engine object
@@ -202,21 +199,6 @@ void framebuffer_callback(GLFWwindow* window, int width, int height)
 
 //// ---- InputHandler ---- ////
 
-struct InputHandler::InputHandlerImpl {
-    Listener<CallbackSKey> k_sb_skeys[keys::NYREM_KEY_LAST];
-    Listener<CallbackLoopKey> k_loop_keys[keys::NYREM_KEY_LAST];
-    std::unordered_set<KeyType> k_loop_checks;
-    
-    Listener<CallbackKey> k_cb_key;
-    Listener<CallbackChar> k_cb_character;
-    Listener<CallbackCursorPos> k_cb_cursorpos, k_loop_cursorpos;
-    Listener<CallbackCursorButton> k_cb_mousebutton, k_loop_mousebutton;
-    Listener<CallbackCursorScroll> k_cb_scroll;
-    Listener<CallbackDrop> k_cb_drop;
-
-    double cursorX, cursorY;
-};
-
 InputHandler::InputHandler(const InputHandler & handler) {
     k_impl = std::make_unique<InputHandlerImpl>(*(handler.k_impl));
 }
@@ -224,6 +206,19 @@ InputHandler::InputHandler(const InputHandler & handler) {
 InputHandler& InputHandler::operator=(const InputHandler& handler) {
     k_impl = std::make_unique<InputHandlerImpl>(*(handler.k_impl));
     return *this;
+}
+
+void InputHandler::setChildHandler(const std::string &name, InputHandler &&handler) {
+    k_impl->m_childHandlers[name] = std::move(handler);
+}
+void InputHandler::eraseChildHandler(const std::string &name) {
+    k_impl->m_childHandlers.erase(name);
+}
+InputHandler& InputHandler::getChildHandler(const std::string &name) {
+    auto it = k_impl->m_childHandlers.find(name);
+    if (it == k_impl->m_childHandlers.end())
+        throw std::runtime_error("Could not find input handler ");
+    return it->second;
 }
 
 int nyrem::InputHandler::scanCode(KeyType key) const {
@@ -274,15 +269,104 @@ void WorldHandler::removeTickable(const std::shared_ptr<WorldTickable> &tickable
 }
 void WorldHandler::clearTickables() { k_tickables.clear();}
 
+//// ---- EngineStage ---- ////
+void EngineStage::activate(Navigator &nav) { }
+void EngineStage::deactivate(Navigator &nav) { }
+//// ---- Navigator ---- ////
+
+Navigator::Navigator() noexcept:
+    m_evaluator([](const RouteSettings&) { return nullptr; }),
+    m_unknown([](const RouteSettings&) { return nullptr; }) { }
+
+Navigator::Navigator(FnType &&evaluator, FnUnknwonType && unknown,
+    const std::string &initial) noexcept :
+    m_evaluator(std::forward<FnType>(evaluator)),
+    m_unknown(std::forward<FnUnknwonType>(unknown)) {
+    pushNamed(initial);
+}
+
+
+void Navigator::deactivateOld() {
+    if (!m_stages.empty())
+        m_stages.back()->deactivate(*this);
+}
+void Navigator::activateNew() {
+    m_stages.back()->activate(*this);
+}
+
+void Navigator::push(EngineStagePtrType &&stage) {
+    deactivateOld();
+    m_stages.push_back(std::move(stage));
+    activateNew();
+}
+void Navigator::pushNamed(const std::string &name) {
+    deactivateOld();
+    m_stages.push_back(createRoute(name));
+    activateNew();
+}
+void Navigator::pushReplacement(EngineStagePtrType &&stage) {
+    deactivateOld();
+    pop();
+    m_stages.push_back(std::move(stage));
+    activateNew();
+}
+void Navigator::pushReplacementNamed(const std::string &name) {
+    deactivateOld();
+    pop();
+    m_stages.push_back(createRoute(name));
+    activateNew();
+}
+
+bool Navigator::mayPop() noexcept {
+    if (m_stages.empty())
+        return false;
+    m_stages.pop_back();
+    return true;
+}
+void Navigator::pop() {
+    if (m_stages.empty())
+        throw std::runtime_error("Navigator is empty!");
+    m_stages.pop_back();
+}
+
+Navigator::EngineStagePtrType& Navigator::front() { return m_stages.front(); }
+Navigator::EngineStagePtrType& Navigator::back() { return m_stages.back(); }
+
+
+bool Navigator::canPop() const noexcept { return !m_stages.empty(); }
+size_t Navigator::size() const noexcept { return m_stages.size(); }
+
+void Navigator::render(const RenderContext &context)
+{
+    RenderContext newContext(context);
+    newContext.store(NAVIGATOR, this);
+    for (auto& stage : m_stages)
+        stage->render(newContext); 
+}
+
+//// ---- MaterialApp ---- ////
+MaterialApp::MaterialApp(
+	std::unique_ptr<Navigator> &&navigator) noexcept :
+    m_navigator(std::move(navigator)) { }
+
+Navigator& MaterialApp::navigator() noexcept {
+    return *m_navigator;
+}
+
+void MaterialApp::render(const RenderContext &ctx)
+{
+    m_navigator->render(ctx);
+}
 
 //// ---- Engine ---- ////
 
 struct Engine::EngineImpl {
     std::vector<std::shared_ptr<EngineTickable>> k_tickables;
     InputHandler k_input;
+    Navigator k_root_nav;
     std::function<void()> k_pre_render;
     std::function<void()> k_post_render;
-    Renderable* k_pipeline = nullptr;
+    std::shared_ptr<Renderable> k_pipeline;
     GLFWwindow* k_window = nullptr;
 };
 
@@ -311,6 +395,7 @@ void Engine::swap(Engine &&engine) {
     k_impl = std::move(engine.k_impl);
 }
 
+Navigator& Engine::navigator() { return k_impl->k_root_nav; }
 InputHandler& Engine::input() { return k_impl->k_input; }
 
 void Engine::keyCallback(int key, int scancode, int action, int mods) {
@@ -425,6 +510,7 @@ void Engine::mainloop()
         int width, height;
         glfwGetFramebufferSize(k_impl->k_window, &width, &height);
         RenderContext context(width, height, 1.0f);
+        context.store(ENGINE, this);
 
         // Updates all child objects
         for (auto & tickable : k_impl->k_tickables)
@@ -440,7 +526,7 @@ void Engine::mainloop()
 
 void Engine::setPreRender(std::function<void()> &&func) { k_impl->k_pre_render = func; }
 void Engine::setPostRender(std::function<void()> &&func) { k_impl->k_post_render = func; }
-void Engine::setPipeline(Renderable *pipeline) { k_impl->k_pipeline = pipeline; }
+void Engine::setPipeline(std::shared_ptr<Renderable> &&pipeline) { k_impl->k_pipeline = std::move(pipeline); }
 
 void Engine::registerEngineUpdate(const std::shared_ptr<EngineTickable> &tickable) { k_impl->k_tickables.push_back(tickable); }
 void Engine::removeTickable(const std::shared_ptr<EngineTickable> &tickable) {

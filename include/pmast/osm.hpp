@@ -240,7 +240,7 @@ namespace traffic
 		virtual size_t getManagedSize() const;
 		virtual size_t getSize() const;
 
-		glm::vec2 asVector() const;
+		glm::dvec2 asVector() const;
 
 		/// <summary> Returns the latitude of this node </summary>
 		/// <returns>The node's latitude</returns>
@@ -539,8 +539,8 @@ namespace traffic
 		const OSMRelation& getRelation(int64_t id) const;
 
 		int64_t findClosestNode(float lat, float lon) const;
-		std::vector<std::vector<glm::vec2>> findBuildings() const;
-		
+		std::vector<std::vector<glm::dvec2>> findBuildings() const;
+
 		/// (1) Adds a new node to this map
 		/// (2) Adds a new way to this map
 		/// (3) Adds a new relation to this map
@@ -667,54 +667,6 @@ namespace traffic
 		std::vector<OSMSegment> m_chunks;
 		size_t m_latChunks, m_lonChunks;
 		size_t m_latOffset, m_lonOffset;
-	};
-
-} // namespace traffic
-
-// Experimental !!
-namespace traffic
-{
-	struct StatusRequest {
-
-	};
-
-	struct AgentTransfer {
-
-	};
-
-	struct BorderChange {
-
-	};
-
-	struct DataTransfer {
-
-	};
-
-	class WorkerInterface {
-		/// Checks the status of the Worker. The function will return
-		/// true if this worker is active and successfully connected to
-		/// the network. Returns false otherwise.
-		virtual bool requestStatus(const StatusRequest& req) = 0;
-
-		/// Requests to transfer an agent from the current worker to
-		/// this worker. Returns true if the transfer was successfully.
-		/// Returns false if the transfer failed.
-		virtual bool requestAgentTransfer(const AgentTransfer& req) = 0;
-
-		/// Requests to change the position of a border node. This cannot
-		/// be done by the worker on its own because the coordination of
-		/// both workers is needed to change it. Returns true if the change
-		/// was successfully. Returns false otherwise.
-		virtual bool requestBorderChange(const BorderChange& req) = 0;
-
-		/// Requests to transfer data to this worker. This function may
-		/// be used to transfer arbitrary data between the workers.
-		virtual bool requestDataTransfer(const DataTransfer& rqeq) = 0;
-	};
-
-	class GlobalXMLMap {
-	protected:
-		std::vector<OSMSegment> childMaps;
 	};
 
 	// Converts nodes to json files

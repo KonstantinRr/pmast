@@ -48,21 +48,48 @@ struct CallbackForm {
 
 template<typename Type>
 struct CallbackReturn {
-	int32_t id;
-	std::vector<CallbackForm<Type>> *parent;
+	using ThisType = CallbackReturn<Type>;
+	using CallbackReturnType = ThisType;
 
-	CallbackReturn(int32_t id, std::vector<CallbackForm<Type>>* parent)
-		: id(id), parent(parent) { }
+	std::vector<CallbackForm<Type>> *parent;
+	int32_t id;
+	bool autoRemove;
+
+	CallbackReturn() : id(-1), autoRemove(false) { }
+	CallbackReturn(int32_t id,
+		std::vector<CallbackForm<Type>>* parent, bool autoRemove=false)
+		: id(id), parent(parent), autoRemove(autoRemove) { }
+
+	CallbackReturn(const ThisType&) = delete;
+	CallbackReturn(ThisType &&mv) :
+		parent(std::exchange(mv.parent, nullptr)),
+		id(std::exchange(mv.id, -1)),
+		autoRemove(std::exchange(mv.autoRemove, false)) { }
+
+	ThisType& operator=(const ThisType &) = delete;
+	ThisType& operator=(ThisType &&mv) {
+		parent = std::exchange(mv.parent, nullptr);
+		id = std::exchange(mv.id, -1);
+		autoRemove = std::exchange(mv.autoRemove, false);
+		return *this;
+	}
+
+	~CallbackReturn() {
+		if (autoRemove)
+			remove();
+	}
 
 	bool isActive() const { return id != -1; }
 	void remove() {
-		for (size_t i = 0; i < parent->size();) {
-			if ((*parent)[i].id == id)
-				parent->erase(parent->begin() + i);
-			else
-				i++;
+		if (id != -1) {
+			for (size_t i = 0; i < parent->size();) {
+				if ((*parent)[i].id == id)
+					parent->erase(parent->begin() + i);
+				else
+					i++;
+			}
+			id = -1;
 		}
-		id = -1;
 	}
 };
 
@@ -70,17 +97,18 @@ template<typename Type>
 class Listener {
 protected:
 	std::vector<CallbackForm<Type>> callbacks;
+	int32_t lastIndex = 1000;
 
 public:
 	template<typename FType>
-	CallbackReturn<Type> listen(FType && function) {
-		int32_t id = callbacks.empty() ? 0 : callbacks.back().id + 1;
+	CallbackReturn<Type> listen(bool autoRemove, FType && function) {
+		int32_t id = lastIndex++;
 		callbacks.push_back(
 			CallbackForm<Type>(
 				id, std::function<Type>(function)
 			)
 		);
-		return CallbackReturn<Type>(id, &callbacks);
+		return CallbackReturn<Type>(id, &callbacks, autoRemove);
 	}
 
 	template<typename ... Args>

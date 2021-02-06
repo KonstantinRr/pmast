@@ -100,6 +100,13 @@ std::vector<int> generateIndices(size_t length) {
 	return indices;
 }
 
+template<typename Type>
+void implInvertWinding(std::vector<Type> &objects) {
+	for (size_t i = 0; i + 3 <= objects.size(); i += 3)
+		std::swap(objects[i + 1], objects[i + 2]);
+}
+
+
 /////////////////////////////
 //// ---- HeightMap ---- ////
 HeightMap::HeightMap(size_t size) {
@@ -163,7 +170,7 @@ std::string ExportFile::info() const {
 	return fmt::format("ExportFile[dataSize: {}, exportMacros: {}]",
 		data.size(), exp.size());
 }
-std::string ExportFile::detail(char seperator, bool separateSegments) const {
+std::string ExportFile::detail(int max, char seperator, bool separateSegments) const {
 	FastSStream stream(
 		data.size() * 3 + exp.size() * 3 + 2,
 		data.size() + exp.size());
@@ -171,7 +178,11 @@ std::string ExportFile::detail(char seperator, bool separateSegments) const {
 	size_t rowLengthMacro = 1;
 	
 	stream.add("==== Detailed Export File Data Report: ====");
-	for (size_t i = 0; i < data.size();) {
+	size_t maxRowCounter = max < 0 ?
+		std::numeric_limits<size_t>::max() :
+		static_cast<size_t>(max);
+	size_t rowCounter = 0;
+	for (size_t i = 0; i < data.size() && rowCounter < maxRowCounter; rowCounter++) {
 		stream.add('\n');
 		for (const auto &expMacro : exp) {
 			for (size_t k = 0; k < expMacro.size; k++) {
@@ -409,6 +420,20 @@ void MeshBuilder2D::addVertex(glm::vec2 vertex) { vertices.push_back(vertex); }
 void MeshBuilder2D::addTextureCoord(glm::vec2 vertex) { texCoords.push_back(vertex); }
 void MeshBuilder2D::addColor(glm::vec3 color) { colors.push_back(color); }
 
+MeshBuilder2D& MeshBuilder2D::invertWinding(bool indexed) noexcept
+{
+	if (indexed) {
+		implInvertWinding(v_indices);
+		implInvertWinding(vt_indices);
+		implInvertWinding(vc_indices);
+	} else {
+		implInvertWinding(vertices);
+		implInvertWinding(texCoords);
+		implInvertWinding(colors);
+	}
+	return *this;
+}
+
 MeshBuilder2D& MeshBuilder2D::addMesh(const MeshBuilder2D &mesh) noexcept
 {
 	// appends the mesh data
@@ -518,8 +543,11 @@ MeshBuilder2D& MeshBuilder2D::addPolygon(
 	std::vector<N> indices = mapbox::earcut<N>(storage);
 
 	vertices.reserve(vertices.size() + indices.size());
-	for (auto idx : indices)
+	v_indices.reserve(v_indices.size() + indices.size());
+	for (auto idx : indices) {
+		v_indices.push_back(static_cast<IndexType>(vertices.size()));
 		vertices.push_back(storage.findByIdx(idx));
+	}
 	return *this;
 }
 
@@ -712,15 +740,39 @@ size_t MeshBuilder::minYExtentIndex() const { return impl_minYExtentIndex(vertic
 size_t MeshBuilder::maxZExtentIndex() const { return impl_maxZExtentIndex(vertices); }
 size_t MeshBuilder::minZExtentIndex() const { return impl_minZExtentIndex(vertices); }
 
-void MeshBuilder::add(
-	const MeshBuilder2D &mesh, float height,
+MeshBuilder& MeshBuilder::invertWinding(bool indexed) noexcept
+{
+	if (indexed) {
+		implInvertWinding(v_indices);
+		implInvertWinding(vn_indices);
+		implInvertWinding(vt_indices);
+		implInvertWinding(vc_indices);
+	} else {
+		implInvertWinding(vertices);
+		implInvertWinding(normals);
+		implInvertWinding(texcoords);
+		implInvertWinding(colors);
+	}
+	// inverts the normals so they point in the opposite direction
+	for (size_t i = 0; i < normals.size(); i++)
+		normals[i] = -normals[i];
+	return *this;
+}
+
+MeshBuilder& MeshBuilder::add(
+	const MeshBuilder2D &mesh, float height, bool up,
 	bool srcIndex, bool dstIndex) noexcept
 {
+	// determines whether the model looks up or down
+	vec3 normal = vec3(0.0f, up ? 1.0f : -1.0f, 0.0f);
+
 	const auto& verts2D = mesh.getVertices();
-	vertices.reserve(vertices.size() + mesh.getVertices().size());	
+	vertices.reserve(vertices.size() + verts2D.size());	
 	for (size_t i = 0; i < verts2D.size(); i++) {
-		normals.push_back(vec3(0.0f, 1.0f, 0.0f));
-		vertices.push_back(vec3(verts2D[i], height));
+		// the normal vector will always be up 
+		normals.push_back(normal); 
+		vertices.push_back(vec3(verts2D[i].x, height, verts2D[i].y));
+		//vertices.push_back(vec3(verts2D[i], height));
 	}
 	
 	addTextureCoords(
@@ -733,6 +785,36 @@ void MeshBuilder::add(
 	addVerticeIndices(mesh.getV_indices().begin(), mesh.getV_indices().end());
 	addTextureIndices(mesh.getVt_indices().begin(), mesh.getVt_indices().end());
 	addColorIndices(mesh.getVc_indices().begin(), mesh.getVc_indices().end());
+	return *this;
+}
+
+MeshBuilder& MeshBuilder::add(const MeshBuilder &mesh) noexcept
+{
+	addVertices(mesh.getVertices().begin(), mesh.getVertices().end());
+	addTextureCoords(mesh.getTextureCoords().begin(), mesh.getTextureCoords().end());
+	addNormals(mesh.getNormals().begin(), mesh.getNormals().end());
+	addColors(mesh.getColors().begin(), mesh.getColors().end());
+
+	addVerticeIndices(mesh.getVIndices().begin(), mesh.getVIndices().end());
+	addTextureIndices(mesh.getVTIndices().begin(), mesh.getVTIndices().end());
+	addNormalIndices(mesh.getVNIndices().begin(), mesh.getVNIndices().end());
+	addColorIndices(mesh.getVCIndices().begin(), mesh.getVCIndices().end());
+	return *this;
+}
+
+std::string MeshBuilder::info() const noexcept
+{
+	return fmt::format(
+		"MeshBuilder\n"
+		"\tVertices {} Indices {}\n"
+		"\tTexture {} Indices {}\n"
+		"\tNormals {} Indices {}\n"
+		"\tColors {} Indices {}\n",
+		vertices.size(), v_indices.size(),
+		texcoords.size(), vt_indices.size(),
+		normals.size(), vn_indices.size(),
+		colors.size(), vc_indices.size()
+	);
 }
 
 void MeshBuilder::scale(float scale) {

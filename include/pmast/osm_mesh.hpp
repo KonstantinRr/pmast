@@ -29,17 +29,14 @@
 #define OSM_MESH_H
 
 #include <pmast/internal.hpp>
+#include <pmast/osm.hpp>
+#include <pmast/osm_graph.hpp>
 
 #include <glm/glm.hpp>
 #include <vector>
 
 namespace traffic
 {
-    // ---- Forward declarations ---- //
-    class OSMSegment;
-    class World;
-    class Route;
-
     // ---- Plane to Sphere ---- //
 
     /// <summary>Transforms a plane value to a sphere latitude value</summary>
@@ -86,7 +83,6 @@ namespace traffic
 
     // ---- Mesh Generation ---- //
     std::vector<glm::vec2> generateMesh(const OSMSegment& map);
-    std::vector<glm::vec2> generateChunkMesh(const World& world);
     std::vector<glm::vec2> generateRouteMesh(const Route route, const OSMSegment &map);
 
     void unify(std::vector<glm::vec2> &points);

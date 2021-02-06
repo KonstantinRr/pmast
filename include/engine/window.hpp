@@ -30,9 +30,12 @@
 
 #include <engine/internal.hpp>
 #include <engine/listener.hpp>
+#include <engine/shader.hpp>
 
 #include <memory>     // uses std::unique_ptr
 #include <functional>
+#include <unordered_map>
+#include <unordered_set>
 
 NYREM_NAMESPACE_BEGIN
 
@@ -41,18 +44,12 @@ class Tickable;
 class Engine;
 class WorldHandler;
 class InputHandler;
-class Renderable;
 
-//class SizedObject {
-//public:
-//	virtual int width();
-//	virtual int height();
-//
-//	void setWidth(int width);
-//	void setHeight(int height);
-//protected:
-//	int w, h;
-//};
+enum Locations{
+	ENGINE = 0,
+	MEADIA = 1,
+	NAVIGATOR = 2
+};
 
 using MouseType = uint8_t;
 namespace mouse
@@ -202,10 +199,29 @@ public:
 	double cursorX() const;
 	double cursorY() const;
 	
+	void setChildHandler(const std::string &name, InputHandler &&handler);
+	void eraseChildHandler(const std::string &name);
+	InputHandler& getChildHandler(const std::string &name);
+
 protected:
 	friend class Engine;
 
-	struct InputHandlerImpl;
+	struct InputHandlerImpl {
+		std::unordered_map<std::string, InputHandler> m_childHandlers;
+
+		Listener<CallbackSKey> k_sb_skeys[348];
+		Listener<CallbackLoopKey> k_loop_keys[348];
+		std::unordered_set<KeyType> k_loop_checks;
+		
+		Listener<CallbackKey> k_cb_key;
+		Listener<CallbackChar> k_cb_character;
+		Listener<CallbackCursorPos> k_cb_cursorpos, k_loop_cursorpos;
+		Listener<CallbackCursorButton> k_cb_mousebutton, k_loop_mousebutton;
+		Listener<CallbackCursorScroll> k_cb_scroll;
+		Listener<CallbackDrop> k_cb_drop;
+
+		double cursorX, cursorY;
+	};
 	std::unique_ptr<InputHandlerImpl> k_impl;
 };
 
@@ -240,6 +256,85 @@ protected:
 	std::vector<std::shared_ptr<WorldTickable>> k_tickables;
 };
 
+struct RouteSettings {
+	std::string routeName;
+};
+
+class Navigator;
+
+class EngineStage : public Renderable {
+public:
+	virtual ~EngineStage() = default;
+	
+	virtual void activate(Navigator &nav);
+	virtual void deactivate(Navigator &nav);
+};
+
+class Navigator : public Renderable {
+public:
+	using ThisType = Navigator;
+	using NavigatorType = ThisType;
+
+	using EngineStagePtrType = std::shared_ptr<EngineStage>;
+	using FnType = std::function<EngineStagePtrType(const RouteSettings&)>;
+	using FnUnknwonType = std::function<EngineStagePtrType(const RouteSettings&)>;
+
+protected:
+	FnType m_evaluator;
+	FnUnknwonType m_unknown;
+	std::vector<EngineStagePtrType> m_stages;
+
+	EngineStagePtrType createRoute(const std::string &name) {
+		RouteSettings settings{name};
+		auto ptr = m_evaluator(settings);
+		return ptr == nullptr ? m_unknown(settings) : std::move(ptr);
+	}
+
+	void deactivateOld();
+	void activateNew();
+public:
+	Navigator() noexcept;
+	Navigator(
+		FnType &&evaluator, FnUnknwonType&&unknown,
+		const std::string &initial) noexcept;
+
+	virtual ~Navigator() = default;
+
+	void push(EngineStagePtrType &&stage);
+	void pushNamed(const std::string &name);
+	void pushReplacement(EngineStagePtrType &&stage);
+	void pushReplacementNamed(const std::string &name);
+
+	EngineStagePtrType& front();
+	EngineStagePtrType& back();
+
+	bool mayPop() noexcept;
+	void pop();
+
+	virtual void render(const RenderContext &context) override;
+
+	bool canPop() const noexcept;
+	size_t size() const noexcept;
+};
+
+class MaterialApp : public Renderable {
+public:
+	using ThisType = MaterialApp;
+	using MaterialAppType = ThisType;
+
+	std::unique_ptr<Navigator> m_navigator;
+
+public:
+	MaterialApp(
+		std::unique_ptr<Navigator> &&navigator) noexcept;
+
+	virtual ~MaterialApp() = default;
+
+	Navigator& navigator() noexcept;
+
+	virtual void render(const RenderContext &ctx) override;
+};
+
 class Engine {
 public:
 	Engine();
@@ -259,7 +354,7 @@ public:
 	void mainloop();
 	void exit();
 
-	void setPipeline(Renderable* pipeline);
+	void setPipeline(std::shared_ptr<Renderable> &&pipeline);
 	void setPreRender(std::function<void()>&& func);
 	void setPostRender(std::function<void()>&& func);
 
@@ -267,6 +362,7 @@ public:
 	void removeTickable(const std::shared_ptr<EngineTickable>& tickable);
 	void clearTickables();
 
+	Navigator& navigator();
 	InputHandler& input();
 
 public:

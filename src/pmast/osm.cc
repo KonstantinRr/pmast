@@ -135,7 +135,7 @@ OSMNode::OSMNode(const json& json)
 size_t OSMNode::getManagedSize() const { return OSMMapObject::getManagedSize(); }
 size_t OSMNode::getSize() const { return getManagedSize() + sizeof(*this); }
 
-glm::vec2 OSMNode::asVector() const { return glm::vec2(lon, lat); }
+glm::dvec2 OSMNode::asVector() const { return glm::dvec2(lon, lat); }
 
 prec_t OSMNode::getLat() const { return lat; }
 prec_t OSMNode::getLon() const { return lon; }
@@ -674,13 +674,13 @@ int64_t OSMSegment::findClosestNode(float lat, float lon) const
 	return currentID;
 }
 
-std::vector<std::vector<glm::vec2>> OSMSegment::findBuildings() const
+std::vector<std::vector<glm::dvec2>> OSMSegment::findBuildings() const
 {
 	using std::vector;
-	vector<vector<glm::vec2>> buildings;
+	vector<vector<glm::dvec2>> buildings;
 	for (const auto& way : *wayList) {
 		if (way.hasTagValue("building", "yes")) {
-			vector<glm::vec2> building;
+			vector<glm::dvec2> building;
 			for (const auto &ndID : way.getNodes()) {
 				const OSMNode &nd = getNode(ndID);
 				building.push_back(nd.asVector());
