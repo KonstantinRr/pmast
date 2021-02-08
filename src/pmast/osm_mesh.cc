@@ -41,6 +41,30 @@ using namespace traffic;
 
 constexpr double Pi = 3.141592653589793238462643383279502;
 
+OSMViewTransformer::OSMViewTransformer(const OSMSegment &segment)
+	: m_center(0.0f)
+{
+	const auto &nodes = *segment.getNodes();
+	for (size_t i = 0; i < nodes.size(); i++) {
+		m_center += nodes[i].asVector();
+	}
+	m_center /= static_cast<double>(nodes.size());
+	m_center = sphereToPlane(m_center);
+	m_scale = 250.0; // miniture
+	m_scale = 111699.0; // default
+}
+
+glm::dvec2 OSMViewTransformer::transform(glm::dvec2 vec) const {
+	return (sphereToPlane(vec, m_center) - m_center) * m_scale;
+
+}
+glm::dvec2 OSMViewTransformer::inverseTransform(glm::dvec2 vec) const {
+	return planeToSphere((vec / m_scale) + m_center, m_center);
+}
+
+glm::dvec2 OSMViewTransformer::center() const noexcept { return m_center; }
+double OSMViewTransformer::scale() const noexcept { return m_scale; }
+
 // ---- Plane to Sphere ---- //
 
 double traffic::planeToLatitude(double planeLat, dvec2 center)

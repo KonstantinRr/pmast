@@ -43,6 +43,10 @@ using graphmap_t = robin_hood::unordered_node_map<int64_t, size_t>;
 
 namespace traffic
 {
+	// Forward Declarations //
+	class OSMViewTransformer;
+	// ==== //
+
 	class Agent;
 	class World;
 
@@ -175,10 +179,14 @@ namespace traffic
 
 	class TrafficGraphNode {
 	public:
+		using ThisType = TrafficGraphNode;
+		using TrafficGraphNodeType = ThisType;
+
 		/// <summary>
 		/// Stores connections to other nodes using all viable streets from this node.
 		/// </summary>
 		std::vector<TrafficGraphEdge> connections;
+		std::vector<TrafficGraphEdge*> incoming;
 
 		/// <summary>
 		/// Stores the OSM ID for this graph node
@@ -188,7 +196,10 @@ namespace traffic
 		/// <summary>
 		/// Stores the coordinates of this graph node. 
 		/// </summary>
-		prec_t x, y;
+		nyrem::vec2 m_plane;
+
+	public:
+		nyrem::vec2 plane() const noexcept;
 
 		// Link back functions //
 		prec_t lat() const noexcept;
@@ -198,14 +209,17 @@ namespace traffic
 
 	public:
 		TrafficGraphNode() = default;
-		TrafficGraphNode(GraphNode *linked, prec_t x, prec_t y);
+		TrafficGraphNode(GraphNode *linked, nyrem::vec2 plane);
 
+		void unlink() noexcept;
+		void link(GraphNode *nd) noexcept;
 		void linkBack() noexcept;
 	};
 
 	class TrafficGraph {
 	public:
-		explicit TrafficGraph(Graph& graph);
+		explicit TrafficGraph(Graph& graph,
+			const OSMViewTransformer &trans);
 
 		/// <summary>Applies the AStar (A*) path finding algorithm on the graph</summary>
 		/// <param name="start">The starting node ID</param>
@@ -224,9 +238,30 @@ namespace traffic
 		std::vector<TrafficGraphNode>& nodes() noexcept;
 		const std::vector< TrafficGraphNode>& nodes() const noexcept;
 
+		template<typename Func>
+		TrafficGraphNodeIndex closestIdx(Func &&functor) const noexcept
+		{
+			size_t bestIndex = std::numeric_limits<size_t>::max();
+			double bestDistance = std::numeric_limits<double>::max();
+			for (size_t i = 0; i < graphBuffer.size(); i++) {
+				// checks if the node has a link back to a GraphNode
+				double newDistance = functor(graphBuffer[i]);
+				if (newDistance < bestDistance) {
+					bestIndex = i;
+					bestDistance = newDistance;
+				}
+			}
+			return static_cast<TrafficGraphNodeIndex>(bestIndex);
+		}
+
 		TrafficGraphNodeIndex findClosestNodeIdx(const Point &p) const noexcept;
+		TrafficGraphNodeIndex findClosestNodeIdxPlane(nyrem::vec2 vec) const noexcept;
+
+
 		const TrafficGraphNode& findClosestNode(const Point &p) const;
 		TrafficGraphNode& findClosestNode(const Point &p);
+
+
 
 		inline TrafficGraphNode& buffer(size_t size) noexcept {return graphBuffer[size]; }
 		inline const TrafficGraphNode& buffer(size_t size) const noexcept { return graphBuffer[size]; }

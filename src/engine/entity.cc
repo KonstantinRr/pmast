@@ -67,105 +67,34 @@ const Entity::ColorStorage& Entity::getColorStorage() const noexcept { return m_
 //// ---- TransformableEntity ---- ////
 
 TransformableEntity::TransformableEntity(int id,
-    const glm::vec3 &pos, const glm::vec3 &rot, const glm::vec3 &scale)
-    : Entity(id), entityPosition(pos),
-    entityRotation(rot), entityScale(scale) { }
+    const Translation3DSettings &translation,
+    const RotationSettings3DEuler &rotation,
+    const ScaleSettings3D &scale) noexcept :
+    Entity(id), m_translation(translation),
+    m_rotation(rotation), m_scale(scale) { }
 
-Entity& TransformableEntity::move(const glm::vec3 &operation) {
-    entityPosition += operation;
-    return *this;
+
+mat4x4 TransformableEntity::matrix() const noexcept {
+    mat4x4 mat(1.0f);
+    passthroughType(mat);
+    return mat;
 }
-Entity& TransformableEntity::scale(const glm::vec3 &operation) {
-    entityScale *= operation;
-    return *this;
+mat4x4 TransformableEntity::inverse() const noexcept {
+    mat4x4 mat(1.0f);
+    passthroughInverseType(mat);
+    return mat;
 }
-Entity& TransformableEntity::scale(float scale) {
-    entityScale *= scale;
-    return *this;
+void TransformableEntity::passthrough(mat4x4 &mat) const noexcept {
+    passthroughType(mat);
 }
-Entity& TransformableEntity::rotate(const glm::vec3 &operation) {
-    entityRotation += operation;
-    return *this;
+void TransformableEntity::passthrough(vec4 &vec) const noexcept {
+    passthroughType(vec);
 }
-
-Entity& TransformableEntity::rotateX(float angle) { entityRotation[0] += angle; return *this; }
-Entity& TransformableEntity::rotateY(float angle) { entityRotation[1] += angle; return *this; }
-Entity& TransformableEntity::rotateZ(float angle) { entityRotation[2] += angle; return *this; }
-
-Entity& TransformableEntity::setPosition(const glm::vec3 &position) {
-    entityPosition = position;
-    return *this;
+void TransformableEntity::passthroughInverse(mat4x4 &mat) const noexcept {
+    passthroughInverseType(mat);
 }
-Entity& TransformableEntity::setRotation(const glm::vec3 &rotation) {
-    entityRotation = rotation;
-    return *this;
-}
-Entity& TransformableEntity::setScale(const glm::vec3 &scale) {
-    entityScale = scale;
-    return *this;
-}
-Entity& TransformableEntity::setScale(float scale) {
-    entityScale = {scale, scale, scale};
-    return *this;
-}
-
-const glm::vec3& TransformableEntity::getPosition() const { return entityPosition; }
-const glm::vec3& TransformableEntity::getRotation() const { return entityRotation; }
-const glm::vec3& TransformableEntity::getScale() const { return entityScale; }
-
-glm::mat4x4 TransformableEntity::calculateTransformationMatrix() const {
-    glm::mat4x4 meshTransform(1.0f);
-    meshTransform = glm::translate(meshTransform, entityPosition);
-
-    meshTransform = glm::rotate(meshTransform, entityRotation.x, {1.0F, 0.0F, 0.0F});
-    meshTransform = glm::rotate(meshTransform, entityRotation.y, {0.0F, 1.0F, 0.0F});
-    meshTransform = glm::rotate(meshTransform, entityRotation.z, {0.0F, 0.0F, 1.0F});
-
-    meshTransform = glm::scale(meshTransform, entityScale);
-    return meshTransform;
-}
-
-glm::mat3x3 TransformableEntity::calculateNormalMatrix() const {
-    glm::mat3x3 mat(calculateTransformationMatrix());
-    return glm::inverseTranspose(mat);
-}
-
-glm::mat4x4 TransformableEntity::getTransformationMatrix() const { return calculateTransformationMatrix(); }
-glm::mat3x3 TransformableEntity::getNormalMatrix() const { return calculateNormalMatrix(); }
-
-//// ---- MatrixBufferedEntity ---- ////
-MatrixBufferedEntity::MatrixBufferedEntity(int id,
-    const glm::vec3 &position, const glm::vec3 &rotation, const glm::vec3 &scale)
-    : TransformableEntity(id, position, rotation, scale) { }
-
-Entity& MatrixBufferedEntity::move(const glm::vec3 &operation) { dirty(); return TransformableEntity::move(operation);}
-
-Entity& MatrixBufferedEntity::scale(const glm::vec3 &scale) { dirty(); return TransformableEntity::scale(scale); }
-Entity& MatrixBufferedEntity::scale(float scale) { dirty(); return TransformableEntity::scale(scale); }
-
-Entity& MatrixBufferedEntity::rotate(const glm::vec3 &rotation) { dirty(); return TransformableEntity::rotate(rotation); }
-Entity& MatrixBufferedEntity::rotateX(float angle) { dirty(); return TransformableEntity::rotateX(angle); }
-Entity& MatrixBufferedEntity::rotateY(float angle) { dirty(); return TransformableEntity::rotateY(angle); }
-Entity& MatrixBufferedEntity::rotateZ(float angle) { dirty(); return TransformableEntity::rotateZ(angle); }
-
-Entity& MatrixBufferedEntity::setPosition(const glm::vec3 &position) { dirty(); return TransformableEntity::setPosition(position); }
-Entity& MatrixBufferedEntity::setRotation(const glm::vec3 &rotation) { dirty(); return TransformableEntity::setRotation(rotation); }
-Entity& MatrixBufferedEntity::setScale(const glm::vec3 &scale) { dirty(); return TransformableEntity::setScale(scale); }
-Entity& MatrixBufferedEntity::setScale(float scale) { dirty(); return TransformableEntity::setScale(scale); }
-
-glm::mat4x4 MatrixBufferedEntity::getTransformationMatrix() const { rebuild(); return k_buffer->transformationMatrix; }
-glm::mat3x3 MatrixBufferedEntity::getNormalMatrix() const { return k_buffer->normalMatrix; }
-
-void MatrixBufferedEntity::rebuild() const {
-    if (isDirty()) {
-        k_buffer->transformationMatrix = calculateTransformationMatrix();
-        k_buffer->normalMatrix = calculateNormalMatrix();
-        dirty(false);
-    }
-}
-bool MatrixBufferedEntity::isDirty() const { return k_buffer->hasTransformChange; }
-void MatrixBufferedEntity::dirty(bool value) const {
-    k_buffer->hasTransformChange = value;
+void TransformableEntity::passthroughInverse(vec4 &vec) const noexcept {
+    passthroughInverseType(vec);
 }
 
 //// ---- TransformedEntity ---- ////

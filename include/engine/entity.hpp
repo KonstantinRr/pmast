@@ -30,6 +30,7 @@
 
 #include <engine/internal.hpp>
 #include <engine/glmodel.hpp>
+#include <engine/camera.hpp>
 
 #include <glm/glm.hpp>
 
@@ -38,26 +39,6 @@
 #include <functional>
 
 NYREM_NAMESPACE_BEGIN
-
-class IDObject {
-public:
-    IDObject() noexcept;
-    explicit IDObject(uint32_t id) noexcept;
-    virtual ~IDObject() = default;
-
-    /// <summary>Sets the entity's unique ID</summary>
-    /// <param name="id">The new unique entity ID</param>
-    void setID(uint32_t id) noexcept;
-
-    /// <summary>Returns the entity's ID</summary>
-    /// <returns>The unique entity ID</returns>
-    uint32_t getID() const noexcept;
-
-    bool hasID() const noexcept;
-
-protected:
-    uint32_t id;
-};
 
 class TextureStorage {
 
@@ -105,7 +86,7 @@ protected:
 ///   - 4 model slots
 ///   - 4 material slots
 /// </summary>
-class Entity : public IDObject {
+class Entity : public IDObject, public ViewTransformer {
 public:
     using ColorStorage = ColorStorageGeneric<4>;
 
@@ -140,9 +121,6 @@ public:
     const std::shared_ptr<GLTexture2D>& getNormalTexture() const;
     const std::shared_ptr<GLMaterial>& getMaterial() const;
 
-    virtual mat4x4 getTransformationMatrix() const = 0;
-    virtual mat3x3 getNormalMatrix() const = 0;
-
     ColorStorage& getColorStorage() noexcept;
     const ColorStorage& getColorStorage() const noexcept;
 protected:
@@ -162,83 +140,61 @@ protected:
 /// matrix is recalculated every time transformationMatrix() or normalMatrix() is
 /// called. See MatrixBufferedEntity for a solution that buffers the matrix between calls.
 /// </summary>
-class TransformableEntity : public Entity {
+class TransformableEntity : public Entity,
+    protected MatrixBuffer<CalculateMatrix, CalculateMatrix> {
+public:
+    using ThisType = TransformableEntity;
+    using TransformableEntityType = ThisType;
+    using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, CalculateMatrix>;
+
+    using Scale3DType = Scale3D<>;
+    using Translation3DType = Translation3D<>;
+    using Rotation3DType = Rotation3D<>;
+
+protected:
+    Scale3DType m_scale;
+    Translation3DType m_translation;
+    Rotation3DType m_rotation;
+
+    template<typename Type>
+    void passthroughType(Type& tp) const noexcept {
+        m_translation.passthrough(tp);
+        m_rotation.passthrough(tp);
+        m_scale.passthrough(tp);
+    }
+
+    template<typename Type>
+    void passthroughInverseType(Type &tp) const noexcept {
+        m_scale.passthroughInverse(tp);
+        m_rotation.passthroughInverse(tp);
+        m_translation.passthroughInverse(tp);
+    }
+
 public:
     TransformableEntity() = default;
     TransformableEntity(int id,
-        const vec3 &pos = {0.0f, 0.0f, 0.0f},
-        const vec3 &rot = {0.0f, 0.0f, 0.0f},
-        const vec3 &scale = {1.0f, 1.0f, 1.0f});
+        const Translation3DSettings &translation,
+        const RotationSettings3DEuler &rotation,
+        const ScaleSettings3D &scale) noexcept;
     virtual ~TransformableEntity() = default;
 
-    virtual Entity& move(const vec3 &operation);
-
-    virtual Entity& scale(const vec3 &scale);
-    virtual Entity& scale(float scale);
-
-    virtual Entity& rotate(const vec3 &rotation);
-    virtual Entity& rotateX(float angle);
-    virtual Entity& rotateY(float angle);
-    virtual Entity& rotateZ(float angle);
-
-    virtual Entity& setPosition(const vec3 &position);
-    virtual Entity& setRotation(const vec3 &rotation);
-    virtual Entity& setScale(const vec3 &scale);
-    virtual Entity& setScale(float scale);
-
-    const vec3& getPosition() const;
-    const vec3& getRotation() const;
-    const vec3& getScale() const;
-
-    mat4x4 calculateTransformationMatrix() const;
-    mat3x3 calculateNormalMatrix() const;
-
-    virtual mat4x4 getTransformationMatrix() const;
-    virtual mat3x3 getNormalMatrix() const;
+    Scale3DType& scale() noexcept { return m_scale; }
+    Translation3DType& translation() noexcept { return m_translation; }
+    Rotation3DType& rotation() noexcept { return m_rotation; }
+    
+    const Scale3DType& scale() const noexcept { return m_scale; }
+    const Translation3DType& translation() const noexcept { return m_translation; }
+    const Rotation3DType& rotation() const noexcept { return m_rotation; }
+    
+    virtual mat4x4 matrix() const noexcept override;
+	virtual mat4x4 inverse() const noexcept override;
+	virtual void passthrough(mat4x4 &mat) const noexcept override;
+	virtual void passthrough(vec4 &vec) const noexcept override;
+	virtual void passthroughInverse(mat4x4 &mat) const noexcept override;
+	virtual void passthroughInverse(vec4 &vec) const noexcept override;
 
 protected:
     vec3 entityPosition, entityRotation, entityScale;
-};
-
-class MatrixBufferedEntity : public TransformableEntity {
-public:
-    MatrixBufferedEntity() = default;
-    MatrixBufferedEntity(int id,
-        const vec3 &position = {0.0f, 0.0f, 0.0f},
-        const vec3 &rotation = {0.0f, 0.0f, 0.0f},
-        const vec3 &scale = {1.0f, 1.0f, 1.0f});
-    virtual ~MatrixBufferedEntity() = default;
-
-    virtual Entity& move(const vec3 &operation);
-
-    virtual Entity& scale(const vec3 &scale);
-    virtual Entity& scale(float scale);
-
-    virtual Entity& rotate(const vec3 &rotation);
-    virtual Entity& rotateX(float angle);
-    virtual Entity& rotateY(float angle);
-    virtual Entity& rotateZ(float angle);
-
-    virtual Entity& setPosition(const vec3 &position);
-    virtual Entity& setRotation(const vec3 &rotation);
-    virtual Entity& setScale(const vec3 &scale);
-    virtual Entity& setScale(float scale);
-
-    void rebuild() const;
-    bool isDirty() const;
-    void dirty(bool value=true) const;
-
-    virtual mat4x4 getTransformationMatrix() const;
-    virtual mat3x3 getNormalMatrix() const;
-
-protected:
-    struct BufferObject {
-        mat4x4 transformationMatrix = mat4x4(1.0f);
-        mat3x3 normalMatrix = mat3x3(1.0f);
-        bool hasTransformChange = true;
-    };
-    std::unique_ptr<BufferObject> k_buffer
-        = std::make_unique<BufferObject>();
 };
 
 class TransformedEntity : public Entity {

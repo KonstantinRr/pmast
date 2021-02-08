@@ -949,6 +949,17 @@ MeshBuilder& MeshBuilder::addCube(vec3 c, vec3 d) noexcept {
 	return *this;
 }
 
+MeshBuilder& MeshBuilder::addPlane(vec3 p1, vec3 p2, vec3 p3, vec3 p4) noexcept
+{
+	vec3 n1 = glm::normalize(glm::cross(p2 - p1, p3 - p1));
+	vec3 n2 = glm::normalize(glm::cross(p3 - p1, p4 - p1));
+	auto newVertices = { p1, p2, p3, p3, p4, p1 };
+	auto normals = { n1, n1, n1, n2, n2, n2 };
+	addVertices(newVertices.begin(), newVertices.end());
+	addNormals(normals.begin(), normals.end());
+	return *this;
+}
+
 void MeshBuilder::setVIndices(const std::vector<int> &pIndices) { this->v_indices = pIndices; }
 void MeshBuilder::setVNIndices(const std::vector<int> &pIndices) { this->vn_indices = pIndices; }
 void MeshBuilder::setVTIndices(const std::vector<int> &pIndices) { this->vt_indices = pIndices; }

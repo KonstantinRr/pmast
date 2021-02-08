@@ -42,6 +42,7 @@ namespace traffic
 
     class OSMSegment;   // externally defined
     class Graph;        // externally defined
+    class OSMViewTransformer;
     class TrafficGraphEdge; // externally defined
     class TrafficGraphNode; // externally defined
     class TrafficGraph;     // externally defined
@@ -68,50 +69,49 @@ namespace traffic
 
     class PhysicalEntity {
     public:
-        static constexpr prec_t g = (prec_t)9.81;
+        static constexpr float g = (float)9.81;
         
         PhysicalEntity() noexcept;
         PhysicalEntity(
-            prec_t maxAcceleration, prec_t maxDeceleration,
-            prec_t mass, prec_t tireFric) noexcept;
+            float maxAcceleration, float maxDeceleration,
+            float mass, float tireFric) noexcept;
 
-        prec_t downforce() const noexcept;
-        prec_t speed() const noexcept;
-        prec_t energy() const noexcept;
+        float downforce() const noexcept;
+        float speed() const noexcept;
+        float energy() const noexcept;
 
-        prec_t accelerationTime(prec_t newSpeed) const noexcept;
-        prec_t accelerationDistance(prec_t newSpeed) const noexcept;
+        float accelerationTime(float newSpeed) const noexcept;
+        float accelerationDistance(float newSpeed) const noexcept;
 
-        prec_t tireFriction() const noexcept;
-        prec_t mass() const noexcept;
+        float tireFriction() const noexcept;
+        float mass() const noexcept;
         
-        nyrem::vec2& velocity() noexcept;
         nyrem::vec2& position() noexcept;
         const nyrem::vec2& velocity() const noexcept;
         const nyrem::vec2& position() const noexcept;
 
+        void setPosition(nyrem::vec2 pos) noexcept;
+        void setSpeed(float speed) noexcept; 
+
     protected:
-        prec_t d_tireFriction;
+        float d_speed;
+
+        float d_tireFriction;
 
         /// <summary>
         /// The maximum acceleration that the car's engine can deliver in m/s^2.
         /// </summary>
-        prec_t d_maxAcceleration;
+        float d_maxAcceleration;
 
         /// <summary>
         /// The maximum decelleration that the car's brake can deliver in m/s^2
         /// </summary>
-        prec_t d_maxDecelleration;
+        float d_maxDecelleration;
 
         /// <summary>
         /// The mass of this car. Used for future calculation.
         /// </summary>
-        prec_t d_mass;
-
-        /// <summary>
-        /// The car's current velocity
-        /// </summary>
-        nyrem::vec2 d_velocity;
+        float d_mass;
 
         /// <summary>
         /// The car's current position in plane coordinates
@@ -119,26 +119,58 @@ namespace traffic
         nyrem::vec2 d_position;
     };
 
+    class Scheduler {
+    public:
+        using ThisType = Scheduler;
+        using SchedulerType = ThisType;
+
+    protected:
+        const TrafficGraphNode &m_node;
+
+    public:
+        Scheduler(const TrafficGraphNode &node) noexcept;
+        virtual ~Scheduler() = default;
+
+        virtual void update(float dt);
+    };
+
+    class SchedulerAll : public Scheduler {
+    public:
+        using ThisType = SchedulerAll;
+        using SchedulerAllType = ThisType;
+
+    public:
+        SchedulerAll(const TrafficGraphNode &node) noexcept;
+        virtual ~SchedulerAll() = default;
+
+        virtual void update(float dt) override;
+    };
+
+    enum AgentState {
+        ALIVE, DEAD
+    };
     /// <summary>
     /// Agents are entities that act in the world to achieve a certain goal. Each agent
     /// has its own set of believes desires and goals that it tries to achieve. Agents
     /// are generally selfish meaning they always want the best outcome for themselves.
     /// </summary>
-    class Agent {
+    class Agent : public nyrem::IDObject {
     public:
         // ---- Constructors ---- //
         Agent(World &world, TrafficGraph &graph,
             TrafficGraphNodeIndex begin, TrafficGraphNodeIndex end) noexcept;
+        virtual ~Agent() = default;
 
         TrafficGraphNodeIndex m_goal() const noexcept;
 
         void determinePath() noexcept;
 
-        void update(double dt);
+        AgentState update(double dt);
         void makeGreedyChoice();
 
         PhysicalEntity& physical() noexcept;
         const PhysicalEntity& physical() const noexcept;
+
     protected:
         // ---- Member definitions ---- //
         
@@ -212,6 +244,7 @@ namespace traffic
         const std::shared_ptr<OSMSegment>& getMap() const;
         const std::shared_ptr<OSMSegment>& getHighwayMap() const;
         const std::shared_ptr<Graph>& getGraph() const;
+        const std::shared_ptr<OSMViewTransformer>& transformer() const;
         const std::shared_ptr<TrafficGraph>& getTrafficGraph() const;
 
         const std::vector<Agent>& getAgents() const;
@@ -221,6 +254,7 @@ namespace traffic
         nyrem::ConcurrencyManager *m_manager;
         std::shared_ptr<OSMSegment> m_map;
         std::shared_ptr<OSMSegment> k_highway_map;
+        std::shared_ptr<OSMViewTransformer> m_transformer;
 
         std::shared_ptr<Graph> m_graph;
         std::shared_ptr<TrafficGraph> m_traffic_graph;

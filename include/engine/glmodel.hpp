@@ -102,6 +102,7 @@ protected:
     glm::vec4 material;
 
 public:
+    GLMaterial(float x, float y, float z, float w);
     GLMaterial(const glm::vec4 &material = {0.5F, 0.5F, 0.5F, 5.0F});
 
     const glm::vec4& getMaterial() const;

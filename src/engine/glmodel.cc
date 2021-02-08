@@ -211,4 +211,7 @@ GLuint GLTexture2D::getTexture() const { return texture; }
 GLMaterial::GLMaterial(const glm::vec4 &material)
     : material(material) { }
 
+GLMaterial::GLMaterial(float x, float y, float z, float w)
+    : material(x, y, z, w) { }
+
 const glm::vec4& GLMaterial::getMaterial() const { return material; }

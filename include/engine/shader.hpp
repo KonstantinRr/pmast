@@ -66,6 +66,10 @@ public:
 	RenderContext() = default;
 	RenderContext(size_t w, size_t h, float s);
 
+	inline float aspectRatio() const {
+		return static_cast<float>(w) / static_cast<float>(h);
+	}
+
 	inline size_t width() const { return w; }
 	inline size_t height() const { return h; }
 	inline float scale() const { return s; }

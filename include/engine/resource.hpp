@@ -1116,6 +1116,7 @@ public:
 
     MeshBuilder& addCube(vec3 center, float dimension) noexcept;
     MeshBuilder& addCube(vec3 center, vec3 dimensions) noexcept;
+    MeshBuilder& addPlane(vec3 p1, vec3 p2, vec3 p3, vec3 p4) noexcept;
 
     void setVIndices(const std::vector<int> &indices);
     void setVNIndices(const std::vector<int> &indices);

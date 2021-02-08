@@ -110,8 +110,8 @@ int main(int argc, char** argv)
 
     engine->setPipeline(navigator);
     engine->mainloop();
-	engine->setPostRender([]() {
-		
+	engine->setPostRender([&world]() {
+		world->update(0.01);
 	});
     engine->exit();
 

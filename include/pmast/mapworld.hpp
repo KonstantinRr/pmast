@@ -57,9 +57,23 @@ public:
     virtual void activate(nyrem::Navigator &nav) override;
     virtual void deactivate(nyrem::Navigator &nav) override;
 protected:
-    static constexpr float cameraSpeedLeft = 0.01f;
-    static constexpr float cameraSpeedForward = 0.01f;
-    static constexpr float cameraSpeedUp = 0.01f;
+    static constexpr float
+        cameraSpeedLeft = 1.0f,
+        cameraSpeedForward = 1.0f,
+        cameraSpeedUp = 1.0f,
+        cameraSpeedRotateUp = 0.02f,
+        cameraSpeedRotateDown = 0.02f,
+        streetHeight = 0.5f,
+        streetSelectedHeight = 0.8f,
+        streetWidth = 1.0f,
+        agentHeight = 1.0f,
+        streetLengthAdd = 0.5f;
+
+    void generateWayMesh(nyrem::MeshBuilder &mesh,
+        const std::vector<nyrem::vec2> &points,
+        float height, float width);
+
+    std::shared_ptr<nyrem::GLModel> m_cubeModel;
     std::vector<std::shared_ptr<nyrem::GLModel>> models;
 
     nyrem::RenderPipeline m_pipeline;
@@ -67,14 +81,27 @@ protected:
     std::shared_ptr<nyrem::Engine> m_engine;
     std::shared_ptr<World> m_world;
 
+    std::shared_ptr<nyrem::TransformableEntity> m_highway_entity,
+        m_world_entity, m_plane_entity; 
+
     std::shared_ptr<nyrem::RenderList<nyrem::Entity>> m_entities;
     std::shared_ptr<nyrem::Camera3D<>> m_camera;
     std::shared_ptr<nyrem::PhongShader> m_shader;
     std::shared_ptr<nyrem::PhongListStage> m_shader_stage;
 
-    nyrem::CallbackReturn<void(nyrem::KeyEvent)> m_key_w,
-        m_key_s, m_key_a, m_key_d, m_key_g,
-        m_key_space, m_key_shift;
+    bool m_hasStart=false, m_hasEnd=false;
+    nyrem::vec3 m_start, m_end;
+
+    enum KeyIndices {
+        m_key_w = 0, m_key_s = 1, m_key_a = 2,
+        m_key_d = 3, m_key_g = 4, m_key_space = 5,
+        m_key_shift = 6, m_key_up = 7, m_key_down = 8,
+        m_key_left = 9, m_key_right = 10, m_key_r = 11,
+        m_key_t = 12, m_key_enter = 13, m_key_h = 14,
+        m_key_last = 15,
+    };
+
+    nyrem::CallbackReturn<void(nyrem::KeyEvent)> m_keys[m_key_last];
 };
 
 }

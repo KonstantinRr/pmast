@@ -120,28 +120,48 @@ bool lt_check_gl_error(const char* cmd, int line, const char* file);
 
 NYREM_NAMESPACE_BEGIN
 
-	// ---- Matrices ---- //
-	using mat4x4 = glm::mat4x4;
-	using mat3x3 = glm::mat3x3;
-	using mat2x2 = glm::mat2x2;
+class IDObject {
+public:
+    IDObject() noexcept;
+    explicit IDObject(uint32_t id) noexcept;
+    virtual ~IDObject() = default;
 
-	using mat4x4 = glm::mat4x4;
-	using mat3x3 = glm::mat3x3;
-	using mat2x2 = glm::mat2x2;	
-	// ---- Vectors ---- //
-	using vec4 = glm::vec4;
-	using vec3 = glm::vec3;
-	using vec2 = glm::vec2;
-	
-	using dvec4 = glm::dvec4;
-	using dvec3 = glm::dvec3;
-	using dvec2 = glm::dvec2;
-    
-    using quat = glm::quat;
-    template <typename S, typename... Args, typename Char = char>
-    std::basic_string<Char> format(const S& format_str, Args&&... args) {
-        return fmt::format<S, Args..., Char>(format_str, std::forward<Args>(args)...);
-    }
+    /// <summary>Sets the entity's unique ID</summary>
+    /// <param name="id">The new unique entity ID</param>
+    void setID(uint32_t id) noexcept;
+
+    /// <summary>Returns the entity's ID</summary>
+    /// <returns>The unique entity ID</returns>
+    uint32_t getID() const noexcept;
+
+    bool hasID() const noexcept;
+
+protected:
+    uint32_t id;
+};
+
+// ---- Matrices ---- //
+using mat4x4 = glm::mat4x4;
+using mat3x3 = glm::mat3x3;
+using mat2x2 = glm::mat2x2;
+
+using mat4x4 = glm::mat4x4;
+using mat3x3 = glm::mat3x3;
+using mat2x2 = glm::mat2x2;	
+// ---- Vectors ---- //
+using vec4 = glm::vec4;
+using vec3 = glm::vec3;
+using vec2 = glm::vec2;
+
+using dvec4 = glm::dvec4;
+using dvec3 = glm::dvec3;
+using dvec2 = glm::dvec2;
+
+using quat = glm::quat;
+template <typename S, typename... Args, typename Char = char>
+std::basic_string<Char> format(const S& format_str, Args&&... args) {
+    return fmt::format<S, Args..., Char>(format_str, std::forward<Args>(args)...);
+}
 
 NYREM_NAMESPACE_END
 

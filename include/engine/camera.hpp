@@ -482,6 +482,8 @@ public:
 		TypeMatrixBuffer::makeDirty();
 	}
 
+	vec3 translation() const noexcept { return m_settings.translation; }
+
 	virtual mat4x4 matrix() const noexcept override { return translationMatrix(); }
 	virtual mat4x4 inverse() const noexcept override { return inverseTranslationMatrix(); }
 	
@@ -536,7 +538,7 @@ struct RotationSettings3DQuat {
 };
 
 template<
-	typename ForwardBuffer = BufferMatrix,
+	typename ForwardBuffer = CalculateMatrix,
 	typename BackwardBuffer = CalculateMatrix>
 class Rotation3D :
 	public ViewTransformer,
@@ -549,6 +551,11 @@ public:
 
 protected:
 	static constexpr vec3 up = {0.0f, 1.0f, 0.0f};
+	static constexpr vec3 down = {0.0f, -1.0f, 0.0f};
+	static constexpr vec3 forward = {0.0f, 0.0f, -1.0f};
+	static constexpr vec3 backward = {0.0f, 0.0f, 1.0f};
+	static constexpr vec3 left = {1.0f, 0.0f, 0.0f};
+	static constexpr vec3 right = {-1.0f, 0.0f, 0.0f};
 	quat m_quaternion;
 
 	mat4x4 rotationMatrix() const noexcept {
@@ -558,6 +565,10 @@ protected:
 	mat4x4 inverseRotationMatrix() const noexcept {
 		return TypeMatrixBuffer::backwardBufferOrMatrix(
         	[this]() { return glm::inverse(glm::toMat4(m_quaternion)); });
+	}
+
+	static vec3 invertX(vec3 vec) noexcept {
+		return {-vec.x, vec.y, vec.z};
 	}
 
 public:
@@ -572,15 +583,39 @@ public:
 		m_quaternion(rot.m_quaternion) { }
 	~Rotation3D() = default;
 
-	vec3 viewDirection() const noexcept {
-		return m_quaternion * vec3(-1.0f, 0.0f, 0.0f);
+	inline vec3 forwardViewDirection() const noexcept {
+		return invertX(m_quaternion * forward);
+	} 
+	inline vec3 backwardViewDirection() const noexcept {
+		return invertX(m_quaternion * backward);
+	}
+	inline vec3 leftViewDirection() const noexcept { return invertX(m_quaternion * left); }
+	inline vec3 rightViewDirection() const noexcept { return invertX(m_quaternion * right); }
+	inline vec3 upViewDirection() const noexcept { return invertX(m_quaternion * up); }
+	inline vec3 downViewDirection() const noexcept { return invertX(m_quaternion * down); }
+
+	constexpr vec3 forwardDirection() const noexcept { return forward; }
+	constexpr vec3 backwardDirection() const noexcept { return backward; }
+	constexpr vec3 leftDirection() const noexcept { return left; }
+	constexpr vec3 rightDirection() const noexcept { return right; }
+	constexpr vec3 upDirection() const noexcept { return up; }
+	constexpr vec3 downDirection() const noexcept { return down; }
+
+	void rotateUp(float angle) {
+		rotateDown(-angle);
 	}
 
-	vec3 sideDirection() const noexcept {
-		return m_quaternion * vec3(0.0f, 0.0f, 1.0f);
+	void rotateDown(float angle) {
+		//m_quaternion = quat({angle, 0.0f, 0.0f}) * m_quaternion;
+		//TypeMatrixBuffer::makeDirty();
 	}
-	vec3 upDirection() const noexcept {
-		return m_quaternion * vec3(0.0f, 1.0f, 0.0f);
+
+	void rotateLeft(float angle) {
+		m_quaternion = quat({0.0f, -angle, 0.0f}) * m_quaternion;
+		TypeMatrixBuffer::makeDirty();
+	}
+	void rotateRight(float angle) {
+		rotateLeft(-angle);
 	}
 
 	RotationSettings3DQuat quaternionSettings() const noexcept {
@@ -715,6 +750,19 @@ public:
 	virtual void passthroughInverse(vec4 &vec) const noexcept override { vec = rotationMatrix() * vec; }
 };
 
+struct ScaleSettings3D {
+	using ThisType = ScaleSettings3D;
+	using ScaleSettings3DType = ThisType;
+
+	vec3 m_scale;
+
+	ScaleSettings3D() noexcept : m_scale(1.0f) { }
+	ScaleSettings3D(float x, float y, float z) noexcept : m_scale(x, y, z) { }
+	ScaleSettings3D(vec3 scale) noexcept : m_scale(scale) { }
+
+	inline vec3 scale() const noexcept { return m_scale; }
+};
+
 template<
 	typename ForwardBuffer = CalculateMatrix,
 	typename BackwardBuffer = CalculateMatrix>
@@ -725,15 +773,16 @@ public:
 	using TypeMatrixBuffer = MatrixBuffer<CalculateMatrix, BackwardBuffer>;
 
 protected:
-	vec3 m_scale;
+	ScaleSettings3D m_settings;
 
 	vec3 inverseScaleVector() const noexcept {
-		return {1.0 / m_scale.x, 1.0f / m_scale.y, 1.0f / m_scale.z};
+		vec3 sc = m_settings.scale();
+		return {1.0 / sc.x, 1.0f / sc.y, 1.0f / sc.z};
 	}
 
 	mat4x4 scaleMatrix() const noexcept {
 		return TypeMatrixBuffer::forwardBufferOrMatrix(
-        	[this]() { return glm::scale(mat4x4(1.0f), m_scale); });
+        	[this]() { return glm::scale(mat4x4(1.0f), m_settings.scale()); });
 	}
 	mat4x4 inverseScaleMatrix() const noexcept {
 		return TypeMatrixBuffer::backwardBufferOrMatrix(
@@ -741,30 +790,29 @@ protected:
 	}
 
 public:
-	Scale3D() noexcept : m_scale(1.0f) { }
-	Scale3D(float x, float y, float z) noexcept : m_scale(x, y, z) { }
-	Scale3D(vec3 scale) noexcept : m_scale(scale) { }
+	Scale3D() noexcept { }
+	Scale3D(const ScaleSettings3D &settings) : m_settings(settings) { }
 	virtual ~Scale3D() = default;
 
 	virtual mat4x4 matrix() const noexcept override { return scaleMatrix(); }
 	virtual mat4x4 inverse() const noexcept override { return inverseScaleMatrix(); }
 	
 	virtual void passthrough(mat4x4 &mat) const noexcept override {
-		mat = glm::scale(mat, m_scale);
+		mat = glm::scale(mat, m_settings.scale());
 	}
 	virtual void passthrough(vec4 &vec) const noexcept override {
-		vec.x *= m_scale.x;
-		vec.y *= m_scale.y;
-		vec.z *= m_scale.z;
+		vec.x *= m_settings.scale().x;
+		vec.y *= m_settings.scale().y;
+		vec.z *= m_settings.scale().z;
 	}
 
 	virtual void passthroughInverse(mat4x4 &mat) const noexcept override {
 		mat = glm::scale(mat, inverseScaleVector());
 	}
 	virtual void passthroughInverse(vec4 &vec) const noexcept override {
-		vec.x /= m_scale.x;
-		vec.y /= m_scale.y;
-		vec.z /= m_scale.z;
+		vec.x /= m_settings.scale().x;
+		vec.y /= m_settings.scale().y;
+		vec.z /= m_settings.scale().z;
 	}
 };
 
@@ -829,8 +877,8 @@ public:
 /// implementation that caches the matrices.
 /// </summary>
 template<
-	typename ForwardBuffer = BufferMatrix,
-	typename BackwardBuffer = BufferMatrix>
+	typename ForwardBuffer = CalculateMatrix,
+	typename BackwardBuffer = CalculateMatrix>
 class Camera3D :
 	public ViewPipeline,
 	protected MatrixBuffer<ForwardBuffer, BackwardBuffer> {
@@ -879,31 +927,30 @@ public:
 	// ---- Complex Functions ---- //
 	void lookAt(const vec3 &pos, const vec3 &dest, const vec3 &up) noexcept;
 
-	inline vec3 viewDirection() const noexcept { return m_rotation.viewDirection(); }
-	inline vec3 sideDirection() const noexcept { return m_rotation.sideDirection(); }
-	inline vec3 upDirection() const noexcept { return m_rotation.upDirection(); }
 	
 	void moveForward(float distance) {
-		m_translation.move(distance * viewDirection());
+		m_translation.move(distance * m_rotation.forwardViewDirection());
 	}
 
 	void moveBackward(float distance) {
-		return moveForward(-distance);
+		m_translation.move(distance * m_rotation.backwardViewDirection());
 	}
 	void moveUp(float distance) {
-		m_translation.move(distance * upDirection()); 
+		m_translation.move(distance * m_rotation.upDirection()); 
 	}
 	void moveDown(float distance) {
-		moveUp(-distance);
+		m_translation.move(distance * m_rotation.downDirection());
 	}
-
 	void moveLeft(float distance) {
-		m_translation.move(distance * sideDirection());
+		m_translation.move(distance * m_rotation.leftViewDirection());
 	}
-
 	void moveRight(float distance) {
-		return moveLeft(-distance);
+		m_translation.move(distance * m_rotation.rightViewDirection());
 	}
+	void rotateUp(float angle) { m_rotation.rotateUp(angle); }
+	void rotateDown(float angle) { m_rotation.rotateDown(angle); }
+	void rotateLeft(float angle) { m_rotation.rotateLeft(angle); }
+	void rotateRight(float angle) { m_rotation.rotateRight(angle); } 
 
 	// ---- Const access modifiers ---- //
 	inline const TypeProjection3D& projection() const noexcept { return m_projection; }

@@ -441,7 +441,7 @@ void SimpleMVPShader::render(const ViewTransformer& camera, const RenderList<Ent
     for (auto& entity : list) {
         if (!entity->hasModel()) continue;
 
-        loadMVPMatrix(cam * entity->getTransformationMatrix());
+        loadMVPMatrix(cam * entity->matrix());
 
         entity->getModel()->bind(); // binds model
         glDrawArrays(GL_TRIANGLES, 0, entity->getModel()->getSize());
@@ -557,10 +557,12 @@ void PhongShader::render(const ViewPipeline& camera, const RenderList<Entity>& l
 
     glm::mat4x4 cameraView = camera.viewMatrix();
     for (const auto& entity : list) {
-        if (!entity->hasModel()) continue; // entities without model are skipped
+        // entities without model are skipped
+        if (!entity->hasModel()) continue;
         // loads the view transformations
-        glm::mat4x4 modelMatrix(1.0f);
+        glm::mat4x4 modelMatrix = entity->matrix();
         glm::mat4x4 modelView = cameraView * modelMatrix;
+        
         glm::mat3x3 normalMatrix = glm::inverseTranspose(glm::mat3x3(modelMatrix));
         loadModelView(modelView);
         loadNormalMatrix(normalMatrix);
@@ -611,8 +613,9 @@ void PhongShader::render(const ViewPipeline& camera, const RenderBatch<Entity>& 
         glBindTexture(GL_TEXTURE_2D, renderListIt.first);
 
         for (auto& entity : renderListIt.second) {
-            loadModelView(view * entity->getTransformationMatrix());
-            loadNormalMatrix(entity->getNormalMatrix());
+            loadModelView(view * entity->matrix());
+
+            loadNormalMatrix(mat3x3(1.0f)); // TODO
             loadMaterial(entity->getMaterial()->getMaterial());
 
             entity->getModel()->bind(); // binds the model only

@@ -663,9 +663,10 @@ int64_t OSMSegment::findClosestNode(float lat, float lon) const
 {
 	Point p(lat, lon);
 	int64_t currentID = 0;
-	float maxDistance = 1000000000;
+	double maxDistance = 10000000;
 	for (const OSMNode& nd : (*nodeList)) {
-		float dt = p.distanceTo(Point(lat, lon)).getLengthSquared();
+		double dt = p.distanceTo(Point(lat, lon)).getLengthSquared();
+		std::cout << "Distance " << dt << std::endl;
 		if (dt < maxDistance) {
 			maxDistance = dt;
 			currentID = nd.getID();

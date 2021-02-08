@@ -37,6 +37,22 @@
 
 namespace traffic
 {
+    class OSMViewTransformer {
+    public:
+        using ThisType = OSMViewTransformer;
+        using OSMViewTransformerType = ThisType;
+
+        OSMViewTransformer(const OSMSegment &seg);
+
+        glm::dvec2 transform(glm::dvec2 vec) const;
+        glm::dvec2 inverseTransform(glm::dvec2 vec) const;
+        
+        glm::dvec2 center() const noexcept;
+        double scale() const noexcept;
+    protected:
+        double m_scale;
+        glm::dvec2 m_center;
+    };
     // ---- Plane to Sphere ---- //
 
     /// <summary>Transforms a plane value to a sphere latitude value</summary>

@@ -88,16 +88,27 @@ TrafficGraphEdge::TrafficGraphEdge(size_t goal, prec_t weight, prec_t distance)
 
 // ---- TrafficGraphNode ---- //
 
-TrafficGraphNode::TrafficGraphNode(GraphNode* linked, prec_t x, prec_t y)
-	: linked(linked), x(x), y(y)
+TrafficGraphNode::TrafficGraphNode(GraphNode* linked, nyrem::vec2 plane)
+	: linked(linked), m_plane(plane)
 {
 
 }
 
 void TrafficGraphNode::linkBack() noexcept
 {
-	linked->m_linked = this;
+	linked->link(*this);
 }
+void TrafficGraphNode::link(GraphNode *nd) noexcept {
+	linked = nd;
+	linkBack();
+}
+
+void TrafficGraphNode::unlink() noexcept {
+	if (linked && linked->m_linked == this)
+		linked->m_linked = nullptr;
+}
+
+nyrem::vec2 TrafficGraphNode::plane() const noexcept { return m_plane; }
 
 prec_t TrafficGraphNode::lat() const noexcept { return linked->lat; }
 prec_t TrafficGraphNode::lon() const noexcept { return linked->lon; }
@@ -319,20 +330,20 @@ IndexRoute::IndexRoute(std::vector<TrafficGraphNodeIndex> const& nodes) : RouteG
 IndexRoute::IndexRoute(std::vector<TrafficGraphNodeIndex>&& nodes) : RouteGeneric(std::move(nodes)) { }
 
 
-TrafficGraph::TrafficGraph(Graph& graph)
+TrafficGraph::TrafficGraph(Graph& graph, const OSMViewTransformer &trans)
 {
 	std::vector<GraphNode> &buf = graph.getBuffer();
 	// reserves the needed capacity
 	graphBuffer.resize(buf.size());
 	
 	for (size_t i = 0; i < buf.size(); i++) {
-		TrafficGraphNode node(&(buf[i]), buf[i].lat, buf[i].lon);
+		TrafficGraphNode node(&(buf[i]),
+			trans.transform({buf[i].lon, buf[i].lat}));
+		node.connections.resize(buf[i].connections.size());
 		for (size_t k = 0; k < buf[i].connections.size(); k++) {
-			node.connections.resize(buf[i].connections.size());
-
 			int64_t goalIndex = graph.findNodeIndex(buf[i].connections[k].goal);
 			if (goalIndex == -1) {
-				spdlog::warn("FastGraph Creation: Could not find GoalIndex!");
+				spdlog::warn("TrafficGraph Creation: Could not find GoalIndex!");
 				continue;
 			}
 
@@ -341,8 +352,16 @@ TrafficGraph::TrafficGraph(Graph& graph)
 				buf[i].connections[k].weight,
 				buf[i].connections[k].distance
 			);
+			
 		}
 		graphBuffer[i] = std::move(node);
+	}
+
+	// finds all incoming connections
+	for (auto &nd : graphBuffer) {
+		for (auto& connection : nd.connections) {
+			graphBuffer[connection.goal].incoming.push_back(&connection);
+		}
 	}
 }
 
@@ -370,9 +389,13 @@ IndexRoute TrafficGraph::findIndexRoute(
 		nodes[i].visited = false;
 		nodes[i].previous = nullptr;
 		nodes[i].node = &(graphBuffer[i]);
-		nodes[i].heuristic = simpleDistance(
-			glm::dvec2(graphBuffer[i].x, graphBuffer[i].y),
-			glm::dvec2(graphBuffer[goal].x, graphBuffer[goal].y));
+		nodes[i].heuristic = glm::distance(
+			graphBuffer[i].plane(),
+			graphBuffer[goal].plane());
+		// Use for exact computation of latitude and longitude coordinates
+		//nodes[i].heuristic = simpleDistance(
+		//	glm::dvec2(graphBuffer[i].lat(), graphBuffer[i].lon()),
+		//	glm::dvec2(graphBuffer[goal].lat(), graphBuffer[goal].lon()));
 	}
 
 	// Defines a min priority queue
@@ -444,24 +467,47 @@ Route TrafficGraph::toIDRoute(const IndexRoute& idxRoute) const noexcept
 {
 	std::vector<int64_t> out(idxRoute.size());
 	std::transform(idxRoute.begin(), idxRoute.end(), out.begin(),
-		[this](TrafficGraphNodeIndex idx) { return this->buffer(idx).linked->nodeID; });
+		[this](TrafficGraphNodeIndex idx) {
+			GraphNode *linkPtr = this->buffer(idx).linked;
+			// TODO change numerical limits
+			return linkPtr ? linkPtr->nodeID : std::numeric_limits<size_t>::max();
+		});
 	return Route(std::move(out));
 }
 
 TrafficGraphNodeIndex TrafficGraph::findClosestNodeIdx(const Point &p) const noexcept
 {
-	size_t bestIndex = numeric_limits<size_t>::max();
-	prec_t bestDistance = numeric_limits<double>::max();
-	for (size_t i = 0; i < graphBuffer.size(); i++) {
-		double newDistance = traffic::distance(
-			graphBuffer[i].linked->getPosition(), p.toVec());
-		if (newDistance < bestDistance) {
-			bestIndex = i;
-			bestDistance = newDistance;
+	return closestIdx([this, &p](const TrafficGraphNode &nd){
+		if (nd.linked != nullptr) {
+			return traffic::distance(
+				nd.linked->getPosition(), p.toVec());
+		} else {
+			return numeric_limits<double>::max();
 		}
-	}
-	return static_cast<TrafficGraphNodeIndex>(bestIndex);
+	});
+
+	//size_t bestIndex = numeric_limits<size_t>::max();
+	//double bestDistance = numeric_limits<double>::max();
+	//for (size_t i = 0; i < graphBuffer.size(); i++) {
+	//	// checks if the node has a link back to a GraphNode
+	//	if (graphBuffer[i].linked != nullptr) {
+	//		double newDistance = traffic::distance(
+	//			graphBuffer[i].linked->getPosition(), p.toVec());
+	//		if (newDistance < bestDistance) {
+	//			bestIndex = i;
+	//			bestDistance = newDistance;
+	//		}
+	//	}
+	//}
+	//return static_cast<TrafficGraphNodeIndex>(bestIndex);
 }
+
+TrafficGraphNodeIndex TrafficGraph::findClosestNodeIdxPlane(nyrem::vec2 vec) const noexcept
+{
+	return closestIdx([this, vec](const TrafficGraphNode &nd){
+		return glm::distance(nd.plane(), vec);
+	});
+}	
 
 const TrafficGraphNode& TrafficGraph::findClosestNode(const Point &p) const {
 	TrafficGraphNodeIndex idx = findClosestNodeIdx(p);
