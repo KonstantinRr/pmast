@@ -33,45 +33,54 @@
 #include <pmast/osm_graph.hpp>
 #include <engine/graphics.hpp>
 
-namespace traffic
-{
-    /// <summary> Defines the style how the latitude and longitude values are
-	/// mapped to an image that does not necessarily has the same aspect ratio.</summary>
-    enum FitSize {
-		FIT_BOTH, // Fits the width and the height. May lead to distortion
-		FIT_WIDTH, // Fits the width and adapts the height.
-		FIT_HEIGHT // Fits the height and adapts the width.
-	};
+namespace traffic {
 
-	struct RenderParams {
-		prec_t ratioLat, ratioLon, lowerLat, lowerLon;
+/// <summary>
+/// Defines the style how the latitude and longitude values are
+/// mapped to an image that does not necessarily has the same aspect ratio.
+/// </summary>
+enum FitSize {
+	FIT_BOTH, // Fits the width and the height. May lead to distortion
+	FIT_WIDTH, // Fits the width and adapts the height.
+	FIT_HEIGHT // Fits the height and adapts the width.
+};
 
-		/// <summary>Creates the render params using a bounding box, render style and
-		/// the image dimensions. </summary>
-		/// <param name="r">The bounding box that should later be rendered.</param>
-		/// <param name="fit">The render style</param>
-		/// <param name="width">The image dimension</param>
-		/// <param name="height">The image dimension</param>
-		RenderParams(const Rect &r, FitSize fit, size_t width, size_t height);
-		RenderParams(const OSMSegment &map, const nyrem::ImageRGB8 &image, FitSize fit);
-	};
+/// <summary>
+/// Stores the render parameters used to call
+/// drawRoute or drawMap.
+/// </summary>
+struct RenderParams {
+	prec_t ratioLat, ratioLon, lowerLat, lowerLon;
 
 	/// <summary>
-	/// Draws a route to an image. The render settings are specified by the RenderParams.
+	/// Creates the render params using a bounding box, render style and
+	/// the image dimensions.
 	/// </summary>
-	/// <param name="map">The map that is used as lookup for the route IDs</param>
-	/// <param name="route">The route that is rendered on the page</param>
-	/// <param name="img">The image that is rendered on</param>
-	/// <param name="param">Additional render settings that specify the image boundaries</param>
-	void drawRoute(const OSMSegment& map, const Route& route, nyrem::ImageRGB8 &img, const RenderParams &param);
+	/// <param name="r">The bounding box that should later be rendered.</param>
+	/// <param name="fit">The render style</param>
+	/// <param name="width">The image dimension</param>
+	/// <param name="height">The image dimension</param>
+	RenderParams(const Rect &r, FitSize fit, size_t width, size_t height);
+	RenderParams(const OSMSegment &map, const nyrem::ImageRGB8 &image, FitSize fit);
+};
 
-	/// <summary>
-	/// Renders a complete map to an image. The render settings are specified by the RenderParams.
-	/// </summary>
-	/// <param name="map">The map that is rendered to the image</param>
-	/// <param name="img">The image the map is rendered on</param>
-	/// <param name="param">Additional render settings that specify the image boundaries</param>
-	void drawMap(const OSMSegment& map, nyrem::ImageRGB8 &img, const RenderParams &param);
-} // trafficc
+/// <summary>
+/// Draws a route to an image. The render settings are specified by the RenderParams.
+/// </summary>
+/// <param name="map">The map that is used as lookup for the route IDs</param>
+/// <param name="route">The route that is rendered on the page</param>
+/// <param name="img">The image that is rendered on</param>
+/// <param name="param">Additional render settings that specify the image boundaries</param>
+void drawRoute(const OSMSegment& map, const Route& route, nyrem::ImageRGB8 &img, const RenderParams &param);
+
+/// <summary>
+/// Renders a complete map to an image. The render settings are specified by the RenderParams.
+/// </summary>
+/// <param name="map">The map that is rendered to the image</param>
+/// <param name="img">The image the map is rendered on</param>
+/// <param name="param">Additional render settings that specify the image boundaries</param>
+void drawMap(const OSMSegment& map, nyrem::ImageRGB8 &img, const RenderParams &param);
+
+} // traffic
 
 #endif

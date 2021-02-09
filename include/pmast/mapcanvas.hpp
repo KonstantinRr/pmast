@@ -48,27 +48,62 @@ class Route; // externally defined Route class
 /// A canvas that is used to render a map to the screen. This canvas uses its own
 /// OpenGL shaders to render a mesh of the map dynamically on the screen. It offers
 /// some functions to manipulate the view matrix (zoom, rotation, translation).
+/// It implements the EngineStage interface.
 /// </summary>
 class MapCanvas : public nyrem::EngineStage {
 public:
+	using ThisType = MapCanvas;
+	using MapCanvasType = ThisType;
+public:
+	/// <summary>
+	/// Creates a MapCanvas that has access to the world and the engine.
+	/// </summary>
+	/// <param name="engine">The engine that is used to display the map.</param>
+	/// <param name="world">The world that this map renders.</param>
 	MapCanvas(
 		const std::shared_ptr<nyrem::Engine> &engine,
 		const std::shared_ptr<traffic::World> &world);
 
 	virtual ~MapCanvas() = default;
 
+	/// <summary>
+	/// Returns the render pipeline used by this object.
+	/// </summary>
 	inline nyrem::RenderPipeline& getPipeline() {
 		return l_pipeline;
 	}
 
+	/// <summary>
+	/// Renders the map using the given RenderContext.
+	/// This method is part of the Renderable interface.
+	/// </summary>
 	virtual void render(const nyrem::RenderContext &context) override;
 
+	/// <summary>
+	/// Activates this stage by loading all the required keybindings.
+	/// </summary>
+	virtual void activate(nyrem::Navigator &nav) override;
+
+	/// <summary>
+	/// Deactivates this stage by removing all the required keybindings.
+	/// </summary>
+	virtual void deactivate(nyrem::Navigator &nav) override;
+
 	// ---- Position updates ---- //
+
+	/// <summary>Sets the latitude coordinate. </summary>
 	void setLatitude(double lat);
+	/// <summary>Sets the longitude coordinate. </summary>
 	void setLongitude(double lon);
+	/// <summary>Sets the latutude and longitude coordinates. </summary>
 	void setLatLon(double lat, double lon);
+	/// <summary>Sets the plane position. </summary>
+	/// <param name="pos">The new plane position. </param>
 	void setPosition(glm::dvec2 pos);
+	/// <summary>Sets the zoom value.</summary>
+	/// <param name="zoom">The new zoom. </param>
 	void setZoom(double zoom);
+	
 	void setRotation(double rotation);
 
 	// ---- Positional reads ---- //
@@ -143,10 +178,7 @@ public:
 
 	void setAgentList(const std::vector<Agent> &agentList);
 
-	virtual void activate(nyrem::Navigator &nav) override;
-	virtual void deactivate(nyrem::Navigator &nav) override;
 protected:
-
 	// ---- Mesh access ---- //
 	/// <summary>Clears the currently used mesh</summary>
 	void clearMesh();
@@ -160,6 +192,7 @@ protected:
 	void setChunkMesh(
 		const std::vector<glm::vec2>& points);
 
+protected:
 	// ---- Member variables ---- //
 	std::shared_ptr<World> m_world;
 	std::shared_ptr<nyrem::Engine> m_engine;

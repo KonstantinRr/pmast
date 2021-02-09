@@ -60,23 +60,30 @@ namespace traffic
 	/// OSM objects. It offers some functionality to parse these tags and ids.
 	/// See the class body for more information about the class' member variables.
 	/// </summary>
-	class OSMMapObject
-	{
+	class OSMMapObject {
+	public:
+		using ThisType = OSMMapObject;
+		using OSMMapObjectType = ThisType;
+
 	protected:
 		using vector_map = std::vector<
 			std::pair<std::string, std::string>>;
 
-		/// <summary> Unique identifier of the object inside the closed world.
+		/// <summary>
+		/// Unique identifier of the object inside the closed world.
 		/// Identifiers may be negative in newer versions of the OSM format.
 		/// </summary>
 		int64_t id;
 
-		/// <summary> The version of this object. Each object can be uniquely identified
-		/// by an identifier (ID) and version tag. </summary>
+		/// <summary>
+		/// The version of this object. Each object can be uniquely identified
+		/// by an identifier (ID) and version tag.
+		/// </summary>
 		int32_t version;
 
 	private:
-		/// <summary> List of tags that every entity own. These attributes do not need
+		/// <summary>
+		/// List of tags that every entity own. These attributes do not need
 		/// to follow certain criteria and can store basically every std::string value.
 		/// </summary>
 		std::shared_ptr<vector_map> tags;
@@ -84,57 +91,61 @@ namespace traffic
 	public:
 		// Constructor definitions //
 
-		/// <summary>Creates an unitialized object</summary>
-		/// <returns></returns>
+		/// <summary>
+		/// Creates an unitialized object
+		/// </summary>
 		OSMMapObject();
 
-		/// <summary> Creates an object with the given id and version. The tag list
+		/// <summary>
+		/// Creates an object with the given id and version. The tag list
 		/// will be initialized without any key-value pairs.
 		/// </summary>
 		/// <param name="id">The OSM identifier of this object</param>
 		/// <param name="version">The version of this object</param>
-		/// <returns></returns>
 		explicit OSMMapObject(int64_t id, int32_t version);
 
-		/// <summary> Creates an object with the given id, version and taglist
+		/// <summary>
+		/// Creates an object with the given id, version and taglist
 		/// </summary>
 		/// <param name="id">The OSM identifier of this object</param>
 		/// <param name="version">The version of this object</param>
 		/// <param name="tags">All tags that were specified in the OSM format</param>
-		/// <returns></returns>
 		explicit OSMMapObject(int64_t id, int32_t version,
 			std::shared_ptr<vector_map> tags);
 
-		/// <summary> Parses an OSM object from a JSON enoded object. All child classes
+		/// <summary>
+		/// Parses an OSM object from a JSON enoded object. All child classes
 		/// are required to call this function when they are parsing from a JSON object.
 		/// </summary>
 		/// <param name="json">The JSON encoded object</param>
-		/// <returns></returns>
 		explicit OSMMapObject(const json& json);
 
-		/// <summary> Destroys this object and frees all gather resources</summary>
-		/// <returns></returns>
-		virtual ~OSMMapObject() = default;
 
 		// ---- Getters ---- //
 
-		/// <summary> Returns the ID that is stored in this OSM object</summary>
+		/// <summary>
+		/// Returns the ID that is stored in this OSM object.
+		/// </summary>
 		/// <returns>The identifier of this object (ID)</returns>
 		int64_t getID() const noexcept;
 
-		/// <summary> Returns the version of this OSM object</summary>
+		/// <summary>
+		/// Returns the version of this OSM object.
+		/// </summary>
 		/// <returns>The version of this object</returns>
 		int32_t getVer() const noexcept;
 
 		// ---- Tag functions ---- //
 
-		/// <summary> Returns true whether the tag list contains a tag with the
-		/// given name.</summary>
+		/// <summary>
+		/// Returns true whether the tag list contains a tag with the given name.
+		/// </summary>
 		/// <param name="key">The key which is searched in the map</param>
 		/// <returns>True if the map contains a key with this tag, false otherwise</returns>
 		bool hasTag(const std::string& key) const noexcept;
 
-		/// <summary>Returns whether the tag list contains the given key-value pair. 
+		/// <summary>
+		/// Returns whether the tag list contains the given key-value pair. 
 		/// </summary>
 		/// <param name="key">Key of the key-value pair</param>
 		/// <param name="value">Value of the key-value pair</param>
@@ -158,14 +169,14 @@ namespace traffic
 		/// This does not include the size of this object itself.
 		/// </summary>
 		/// <returns>The amount of bytes managed by this object</returns>
-		virtual size_t getManagedSize() const;
+		size_t getManagedSize() const;
 
 		/// <summary>
 		/// Returns the size of this object. This includes the managed size
 		/// as well as the size of the object itself.
 		/// </summary>
 		/// <returns>The total size that is taken by this object</returns>
-		virtual size_t getSize() const;
+		size_t getSize() const;
 
 		// Encoding / Decoding //
 

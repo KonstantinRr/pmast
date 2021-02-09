@@ -33,10 +33,6 @@
 #	define SPDLOG_FMT_EXTERNAL
 #endif
 
-#ifndef NANOGUI_USE_OPENGL
-	#define NANOGUI_USE_OPENGL
-#endif
-
 #define _CRT_SECURE_NO_WARNINGS 1
 
 #if defined(_WIN32)

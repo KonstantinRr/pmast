@@ -29,7 +29,6 @@
 #define PARSER_HPP
 
 #include <pmast/internal.hpp>
-#include <pmast/agent.hpp>
 #include <pmast/osm.hpp>
 
 #include <engine/thread.hpp>
@@ -37,74 +36,62 @@
 #include <string>
 #include <chrono>
 
-using taglist_t = std::vector<std::pair<std::string, std::string>>;
+namespace traffic {
 
-namespace traffic
+/// <summary>
+/// Stores parser timings. Each call to 
+/// </summary>
+struct ParseTimings
+{
+	std::chrono::high_resolution_clock::time_point
+		begin, endRead, endXMLParse, endDataParse, end;
+
+	/// <summary>Prints a detailed summary on the timings</summary>
+	void summary();
+};
+
+struct ParseArguments
 {
 	/// <summary>
-	/// Stores the parser timings in a combined location
+	/// The concurrency manager used to generate the threads.
+	/// This field might be changed in the future.
 	/// </summary>
-	struct ParseTimings
-	{
-		std::chrono::high_resolution_clock::time_point
-			begin, endRead, endXMLParse, endDataParse, end;
+	nyrem::ConcurrencyManager *pool = nullptr;
 
-		/// <summary>Prints a detailed summary on the timings</summary>
-		void summary();
-	};
+	/// <summary>
+	/// Defines the location where the parser should store additional
+	/// timing information about the parsing process. Does not store
+	/// any information if this value is nullptr.
+	/// </summary>
+	ParseTimings *timings = nullptr;
 
-	struct ParseArguments
-	{
-		int threads = 8;
-		std::string file = "map.xmlmap";
-		nyrem::ConcurrencyManager *pool = nullptr;
-		ParseTimings *timings = nullptr;
-	};
+	/// <summary>
+	/// The path to the file that the parser should parse.
+	/// It should be relative to its current location to ensure
+	/// compability with most systems.
+	/// The default value for this field is "map.osm"
+	/// </summary>
+	std::string file = "map.osm";
 
-	struct OSMNodeTemp
-	{
-		int64_t id; int32_t ver;
-		std::shared_ptr<taglist_t> tags;
-		prec_t lat, lon;
-		
-		OSMNodeTemp(int64_t id, int32_t ver,
-			const std::shared_ptr<taglist_t> &tags,
-			prec_t lat, prec_t lon) : id(id), ver(ver),
-			tags(tags), lat(lat), lon(lon) { }
-	};
+	/// <summary>
+	/// The amount of async threads that will be used to parse the map.
+	/// This field might be changed in the future.
+	/// </summary>
+	int threads = 8;
+};
 
-	struct OSMWayTemp
-	{
-		int64_t id; int32_t ver;
-		std::shared_ptr<taglist_t> tags;
-		std::shared_ptr<std::vector<int64_t>> nodes;
+/// <summary>
+/// Writes an OSM map to disk. This function is currently under
+/// development and not yet supported.
+/// </summary>
+std::vector<unsigned char> writeXOSMMap(const OSMSegment &map, const std::string &file);
 
-		OSMWayTemp(int64_t id, int32_t ver,
-			const std::shared_ptr<taglist_t>& tags,
-			const std::shared_ptr<std::vector<int64_t>>& nodes) :
-			id(id), ver(ver), tags(tags), nodes(nodes) { }
-	};
+/// <summary>
+/// Parses an OSM map by using a map of arguments.
+/// The ParseArguments for more information about the different arguments.
+/// </summary>
+OSMSegment parseXMLMap(const ParseArguments &args);
 
-	struct OSMRelationTemp
-	{
-		int64_t id; int32_t ver;
-		std::shared_ptr<taglist_t> tags;
-		std::shared_ptr<std::vector<RelationMember>> nodes;
-		std::shared_ptr<std::vector<RelationMember>> ways;
-		std::shared_ptr<std::vector<RelationMember>> relations;
-
-		OSMRelationTemp(
-			int64_t id, int32_t ver,
-			const std::shared_ptr<taglist_t> &tags,
-			const std::shared_ptr<std::vector<RelationMember>> &nodes,
-			const std::shared_ptr<std::vector<RelationMember>> &ways,
-			const std::shared_ptr<std::vector<RelationMember>> &relations) :
-			id(id), ver(ver), tags(tags), nodes(nodes),
-			ways(ways), relations(relations) { }
-	};
-
-	std::vector<unsigned char> writeXOSMMap(const OSMSegment &map, const std::string &file);
-	OSMSegment parseXMLMap(const ParseArguments &args);
 } // namespace traffic
 
 #endif

@@ -543,3 +543,8 @@ void traffic::ParseTimings::summary()
 
 	cout << f1 << endl << f2 << endl << f3 << endl;
 }
+
+std::vector<unsigned char> traffic::writeXOSMMap(const OSMSegment &map, const std::string &file)
+{
+
+}

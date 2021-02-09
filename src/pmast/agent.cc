@@ -92,7 +92,6 @@ float PhysicalEntity::accelerationDistance(float newSpeed) const noexcept {
 float PhysicalEntity::tireFriction() const noexcept { return d_tireFriction; }
 float PhysicalEntity::mass() const noexcept { return d_mass; }
 const nyrem::vec2& PhysicalEntity::position() const noexcept { return d_position; }
-nyrem::vec2& PhysicalEntity::position() noexcept { return d_position; }
 
 void PhysicalEntity::setPosition(nyrem::vec2 pos) noexcept {
     d_position = pos;
@@ -107,19 +106,29 @@ Scheduler::Scheduler(const TrafficGraphNode &node) noexcept
 
 }
 
-void Scheduler::update(float dt) {
-
-}
-
-
-SchedulerAll::SchedulerAll(const TrafficGraphNode &node) noexcept
-    : Scheduler(node)
+void Scheduler::update(float dt)
 {
 
 }
 
-void SchedulerAll::update(float dt) {
+// ---- SchedulerAll ---- //
 
+SchedulerAll::SchedulerAll(const TrafficGraphNode &node) noexcept
+    : Scheduler(node) { }
+
+void SchedulerAll::update(float dt)
+{
+
+}
+
+// ---- SchedulerRightBeforeLeft ---- //
+
+SchedulerRightBeforeLeft::SchedulerRightBeforeLeft(
+    const TrafficGraphNode &node) noexcept : Scheduler(node) { }
+
+void SchedulerRightBeforeLeft::update(float dt)
+{
+    
 }
 
 // ---- Agent ---- //
@@ -132,11 +141,8 @@ Agent::Agent(World& world, TrafficGraph& graph,
 PhysicalEntity& Agent::physical() noexcept { return m_physicalEntity; }
 const PhysicalEntity& Agent::physical() const noexcept { return m_physicalEntity; }
 
-void Agent::determinePath() noexcept
-{
-}
-
-TrafficGraphNodeIndex Agent::m_goal() const noexcept { return m_end; }
+TrafficGraphNodeIndex Agent::goal() const noexcept { return m_end; }
+TrafficGraphNodeIndex Agent::start() const noexcept { return m_begin; }
 
 AgentState Agent::update(double dt)
 {
@@ -184,34 +190,6 @@ AgentState Agent::update(double dt)
     //if (m_edge )
     //m_physicalEntity.position()
     return ALIVE;
-}
-
-void Agent::makeGreedyChoice() {
-    //auto &goal = world->getGraph()->findNodeByID(goalID);
-    //auto &node = world->getGraph()->findNodeByID(nextVisited);
-    //vec2 goalVec = glm::normalize(node.getPosition() - goal.getPosition());
-    //int bestFit = -1;
-    //float bestDotProduct = 0;
-    //for (size_t i = 0; i < node.connections.size(); i++) {
-    //    // Creates the junction vector for each connection
-    //    int64_t junctionCrossID = node.connections[i].goal;
-    //    auto &junctionCrossNode = world->getGraph()->findNodeByID(junctionCrossID);
-    //    vec2 junctionCross = glm::normalize(
-    //        junctionCrossNode.getPosition() - node.getPosition());
-    //    // checks if the junction vector is better than
-    //    // the current best one. Updates the values if so.
-    //    float dotProduct = glm::dot(junctionCross, goalVec);
-    //    if (dotProduct > bestDotProduct) {
-    //        bestDotProduct = dotProduct;
-    //        bestFit = static_cast<int>(i);
-    //    }
-    //}
-    //// There is no way left. The agent is stuck
-    //if (bestFit == -1) {
-    //    // TODO
-    //} else {
-    //    // TODO
-    //}
 }
 
 // ---- WorldChunk ---- //
@@ -309,7 +287,7 @@ void World::createAgent(TrafficGraphNodeIndex start, TrafficGraphNodeIndex end)
     spdlog::info("Creating agent at {} to {}", start, end);
     Agent agent(*this, *m_traffic_graph, start, end);
     auto &trafficNode = m_traffic_graph->buffer(start);
-    agent.physical().position() = trafficNode.linked->getPlanePosition();
+    agent.physical().setPosition(trafficNode.linked->getPlanePosition());
     m_agents.push_back(std::move(agent));
 }
 
