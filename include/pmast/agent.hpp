@@ -149,6 +149,7 @@ namespace traffic
     enum AgentState {
         ALIVE, DEAD
     };
+    
     /// <summary>
     /// Agents are entities that act in the world to achieve a certain goal. Each agent
     /// has its own set of believes desires and goals that it tries to achieve. Agents

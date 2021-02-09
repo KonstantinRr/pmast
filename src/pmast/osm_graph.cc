@@ -94,6 +94,11 @@ TrafficGraphNode::TrafficGraphNode(GraphNode* linked, nyrem::vec2 plane)
 
 }
 
+void TrafficGraphNode::resizeGates() noexcept
+{
+	m_gates.resize(incoming.size() * connections.size());
+}
+
 void TrafficGraphNode::linkBack() noexcept
 {
 	linked->link(*this);
@@ -108,7 +113,20 @@ void TrafficGraphNode::unlink() noexcept {
 		linked->m_linked = nullptr;
 }
 
+void TrafficGraphNode::setPlane(nyrem::vec2 plane) noexcept { m_plane = plane; }
+void TrafficGraphNode::setScheduler(const std::shared_ptr<Scheduler> &sched) noexcept { m_scheduler = sched; }
+
 nyrem::vec2 TrafficGraphNode::plane() const noexcept { return m_plane; }
+std::shared_ptr<Scheduler> TrafficGraphNode::scheduler() const noexcept { return m_scheduler; }
+
+void TrafficGraphNode::setAllGates(bool value) noexcept
+{
+	uint8_t setValue = static_cast<uint8_t>(value);
+	for (size_t i = 0; i < m_gates.size(); i++)
+		m_gates[i] = setValue;
+}
+void TrafficGraphNode::openAllGates() noexcept { setAllGates(false); }
+void TrafficGraphNode::closeAllGates() noexcept { setAllGates(true); }
 
 prec_t TrafficGraphNode::lat() const noexcept { return linked->lat; }
 prec_t TrafficGraphNode::lon() const noexcept { return linked->lon; }

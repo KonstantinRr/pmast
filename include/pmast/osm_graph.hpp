@@ -49,6 +49,7 @@ namespace traffic
 
 	class Agent;
 	class World;
+	class Scheduler;
 
 	using AgentRef = Agent*;
 	using WorldRef = World*;
@@ -78,8 +79,11 @@ namespace traffic
 	/// finding algorithms.
 	/// </summary>
 	template<typename Type>
-	class RouteGeneric
-	{
+	class RouteGeneric {
+	public:
+		using ThisType = RouteGeneric<Type>;
+		using RouteGenericType = ThisType;
+
 	public:
 		// ---- Member definitions ---- //
 		std::vector<Type> nodes;
@@ -103,12 +107,22 @@ namespace traffic
 
 	class Route : public RouteGeneric<int64_t> {
 	public:
+		using ThisType = Route;
+		using RouteType = ThisType;
+		using RouteGenericType = RouteGeneric<int64_t>;
+		
+	public:
 		Route() = default;
 		Route(std::vector<int64_t> const& nodes);
 		Route(std::vector<int64_t>&& nodes);
 	};
 
 	class IndexRoute : public RouteGeneric<TrafficGraphNodeIndex> {
+	public:
+		using ThisType = IndexRoute;
+		using IndexRouteType = ThisType;
+		using RouteGenericType = RouteGeneric<TrafficGraphNodeIndex>;
+	
 	public:
 		IndexRoute() = default;
 		IndexRoute(std::vector<TrafficGraphNodeIndex> const& nodes);
@@ -152,7 +166,7 @@ namespace traffic
 		prec_t distance;
 
 		/// <summary>
-		/// Stores the maximum speed that is allowd on this route. This speed
+		/// Stores tRouteGeneric<TrafficGraphNodeIndex>he maximum speed that is allowd on this route. This speed
 		/// is usually defined by country laws.
 		/// </summary>
 		prec_t maxAllowedSpeed;
@@ -177,35 +191,79 @@ namespace traffic
 		TrafficGraphEdge(size_t goal, prec_t weight, prec_t distance);
 	};
 
+	/// <summary>
+	/// Represents a node in the traffic network. Nodes contain a list of
+	/// outgoing and incoming connections to other nodes, have a fixed
+	/// position in plane space and are connected to a scheduler that
+	// is controlling the gates of the nodes.
+	/// </summary>
 	class TrafficGraphNode {
 	public:
 		using ThisType = TrafficGraphNode;
 		using TrafficGraphNodeType = ThisType;
 
 		/// <summary>
-		/// Stores connections to other nodes using all viable streets from this node.
+		/// Stores connections to other nodes that are reachable
+		/// from this node by using a single edge (street).
 		/// </summary>
 		std::vector<TrafficGraphEdge> connections;
+
+		/// <summary>
+		/// Stores the incoming connections to this node as a list.
+		/// of pointers. The actual edges are always stored as outgoing edges.
+		/// </summary>
 		std::vector<TrafficGraphEdge*> incoming;
 
 		/// <summary>
-		/// Stores the OSM ID for this graph node
+		/// Stores the linked OSM Graph node. This node is used to gain
+		/// information about the OSM attributes of this node. May also be null
+		/// if the graph node is unlinked. 
 		/// </summary>
 		GraphNode *linked;
+
+		/// <summary>
+		/// Stores whether the given gates at an intersection are open. The
+		/// vector is actually a two dimensional array of size incoming.size() *
+		/// connections.size() that is projected on a one dimensional array.
+		/// The value at x * incoming.size() + y with x as index of the incoming
+		/// array, and y as index of the outgoing index stores whether the connection
+		/// of x to y is open. Agents traversing the network are required to wait
+		/// before this node until the node / traffic light becomes unblocked.
+		/// NOTE: Don't use std::vector<bool> as it does not fullfill the STL container
+		/// requirements because of its special dense memory layout.
+		/// </summary>
+		std::vector<uint8_t> m_gates;
+
+
+		std::shared_ptr<Scheduler> m_scheduler;
 		
 		/// <summary>
-		/// Stores the coordinates of this graph node. 
+		/// Stores the coordinates of this graph node in plane space.
 		/// </summary>
 		nyrem::vec2 m_plane;
 
 	public:
+		/// <summary>Sets the plane coordinates of this node.</summary>
+		void setPlane(nyrem::vec2 plane) noexcept;
+		/// <summary>Sets the scheduler for this node.</summary>
+		void setScheduler(const std::shared_ptr<Scheduler> &sched) noexcept;
+
+		/// <summary>Returns the plane coordinates of this node.</summary>
 		nyrem::vec2 plane() const noexcept;
+		/// <summary>Returns the scheduler responsible for this node.</summary>
+		std::shared_ptr<Scheduler> scheduler() const noexcept;
 
 		// Link back functions //
+		
 		prec_t lat() const noexcept;
 		prec_t lon() const noexcept;
 		int64_t nodeID() const noexcept;
 
+		void resizeGates() noexcept;
+
+		void setAllGates(bool value) noexcept;
+		void openAllGates() noexcept;
+		void closeAllGates() noexcept;
 
 	public:
 		TrafficGraphNode() = default;

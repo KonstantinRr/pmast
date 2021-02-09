@@ -163,7 +163,7 @@ add_subdirectory("ext/spdlog")
 target_link_libraries(engine
   PUBLIC spdlog
   PRIVATE glfw
-  PRIVATE fmt::fmt
+  PUBLIC fmt::fmt
   PRIVATE ${CMAKE_DL_LIBS})
 target_include_directories(engine
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"
