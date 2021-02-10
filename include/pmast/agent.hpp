@@ -50,7 +50,11 @@ class TrafficGraph;     // externally defined
 using AgentRef = Agent*;
 using WorldRef = World*;
 
+
 struct EnvironmentalInfo {
+    using ThisType = EnvironmentalInfo;
+    using EnvironmentalInfoType = ThisType;
+
     /// <summary>
     /// Stores the global friction coefficient
     /// </summary>
@@ -418,12 +422,34 @@ public:
 
     // ---- Access modifiers ---- //
 
+    /// <summary>
+    /// Returns a reference to the map that defines this world.
+    /// </summary>
     const std::shared_ptr<OSMSegment>& getMap() const;
+
+    /// <summary>
+    /// Returns a reference to the highway map generated from the map.
+    /// </summary>
     const std::shared_ptr<OSMSegment>& getHighwayMap() const;
+
+    /// <summary>
+    /// Returns the graph generated from the highway map.
+    /// </summary>
     const std::shared_ptr<Graph>& getGraph() const;
+
+    /// <summary>
+    /// Returns a reference to the transformer used to translate coordinates.
+    /// </summary>
     const std::shared_ptr<OSMViewTransformer>& transformer() const;
+
+    /// <summary>
+    /// Returns a reference to the traffic graph generated from the highway graph.
+    /// </summary>
     const std::shared_ptr<TrafficGraph>& getTrafficGraph() const;
 
+    /// <summary>
+    /// Returns a reference to the list of agents.
+    /// </summary>
     const std::vector<Agent>& getAgents() const;
 
 protected:

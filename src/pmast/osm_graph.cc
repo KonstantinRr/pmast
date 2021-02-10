@@ -101,7 +101,8 @@ void TrafficGraphNode::resizeGates() noexcept
 
 void TrafficGraphNode::linkBack() noexcept
 {
-	linked->link(*this);
+	if (linked)
+		linked->link(*this);
 }
 void TrafficGraphNode::link(GraphNode *nd) noexcept {
 	linked = nd;
@@ -128,9 +129,21 @@ void TrafficGraphNode::setAllGates(bool value) noexcept
 void TrafficGraphNode::openAllGates() noexcept { setAllGates(false); }
 void TrafficGraphNode::closeAllGates() noexcept { setAllGates(true); }
 
-prec_t TrafficGraphNode::lat() const noexcept { return linked->lat; }
-prec_t TrafficGraphNode::lon() const noexcept { return linked->lon; }
-int64_t TrafficGraphNode::nodeID() const noexcept { return linked->nodeID; }
+prec_t TrafficGraphNode::lat() const noexcept {
+	if (linked)
+		return linked->lat;
+	return prec_t(0);
+}
+prec_t TrafficGraphNode::lon() const noexcept {
+	if (linked)
+		return linked->lon;
+	return prec_t(0);
+}
+int64_t TrafficGraphNode::nodeID() const noexcept {
+	if (linked)
+		return linked->nodeID;
+	return -1;
+}
 
 // ---- GraphEdge ---- //
 
@@ -145,8 +158,7 @@ GraphEdge::GraphEdge(int64_t goalID, prec_t weight, prec_t distance) :
 GraphNode::GraphNode(const OSMNode &node) :
 	lat(node.getLat()),
 	lon(node.getLon()),
-	nodeID(node.getID()),
-	plane(sphereToPlane({lon, lat})) // TODO wtf?
+	nodeID(node.getID())
 {
 
 }

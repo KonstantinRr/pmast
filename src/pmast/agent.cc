@@ -128,7 +128,7 @@ SchedulerRightBeforeLeft::SchedulerRightBeforeLeft(
 
 void SchedulerRightBeforeLeft::update(float dt)
 {
-    
+
 }
 
 // ---- Agent ---- //
@@ -287,7 +287,7 @@ void World::createAgent(TrafficGraphNodeIndex start, TrafficGraphNodeIndex end)
     spdlog::info("Creating agent at {} to {}", start, end);
     Agent agent(*this, *m_traffic_graph, start, end);
     auto &trafficNode = m_traffic_graph->buffer(start);
-    agent.physical().setPosition(trafficNode.linked->getPlanePosition());
+    agent.physical().setPosition(trafficNode.plane());
     m_agents.push_back(std::move(agent));
 }
 
