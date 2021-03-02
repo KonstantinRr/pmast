@@ -50,12 +50,14 @@ public:
 
     void loadWorld(const std::shared_ptr<traffic::OSMSegment> &map) noexcept;
     void loadHighway(const std::shared_ptr<traffic::OSMSegment> &highwayMap) noexcept;
-    void createKeyBindings();
 
     virtual void render(const nyrem::RenderContext &context) override;
 
     virtual void activate(nyrem::Navigator &nav) override;
     virtual void deactivate(nyrem::Navigator &nav) override;
+
+    bool isRunning() const noexcept;
+
 protected:
     static constexpr float
         cameraSpeedLeft = 1.0f,
@@ -73,6 +75,7 @@ protected:
         const std::vector<nyrem::vec2> &points,
         float height, float width);
 
+protected:
     std::shared_ptr<nyrem::GLModel> m_cubeModel;
     std::vector<std::shared_ptr<nyrem::GLModel>> models;
 
@@ -89,8 +92,6 @@ protected:
     std::shared_ptr<nyrem::PhongShader> m_shader;
     std::shared_ptr<nyrem::PhongListStage> m_shader_stage;
 
-    bool m_hasStart=false, m_hasEnd=false;
-    nyrem::vec3 m_start, m_end;
 
     enum KeyIndices {
         m_key_w = 0, m_key_s = 1, m_key_a = 2,
@@ -98,10 +99,13 @@ protected:
         m_key_shift = 6, m_key_up = 7, m_key_down = 8,
         m_key_left = 9, m_key_right = 10, m_key_r = 11,
         m_key_t = 12, m_key_enter = 13, m_key_h = 14,
-        m_key_last = 15,
+        m_key_z = 15, m_key_x = 16, m_key_last = 16,
     };
 
     nyrem::CallbackReturn<void(nyrem::KeyEvent)> m_keys[m_key_last];
+    
+    nyrem::vec3 m_start, m_end;
+    bool m_hasStart=false, m_hasEnd=false, m_run=false;
 };
 
 }

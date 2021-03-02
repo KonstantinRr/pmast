@@ -135,9 +135,10 @@ void MapWorld::activate(nyrem::Navigator &nav)
             
             // finds the positions of all routes on the way
             std::vector<vec2> positions(route.size());
-            for (size_t i = 0; i < route.size(); i++)
+            for (size_t i = 0; i < route.size(); i++) {
+                spdlog::info("Point {}", route[i]);
                 positions[i] = traffic->findNodeByIndex(route[i]).plane();
-        
+            }
             MeshBuilder builder;
             generateWayMesh(builder, positions,
                 streetSelectedHeight, streetWidth);
@@ -176,6 +177,16 @@ void MapWorld::activate(nyrem::Navigator &nav)
             m_world->createAgent(idStart, idStop);
         }
     });
+    m_keys[m_key_z] = m_input.callbackKey(NYREM_KEY_Z).listen(true, [this](KeyEvent e) {
+        if (e.action == KEYSTATUS_PRESSED)
+            m_run = true; 
+    });
+    m_keys[m_key_x] = m_input.callbackKey(NYREM_KEY_X).listen(true, [this](KeyEvent e) {
+        if (e.action == KEYSTATUS_PRESSED)
+            m_run = false;
+    });
+
+
 }
 
 void MapWorld::deactivate(nyrem::Navigator &nav)
@@ -184,8 +195,8 @@ void MapWorld::deactivate(nyrem::Navigator &nav)
         m_keys[i].remove();
 }
 
-void MapWorld::createKeyBindings()
-{
+bool MapWorld::isRunning() const noexcept {
+    return m_run;
 }
 
 void MapWorld::loadWorld(const std::shared_ptr<traffic::OSMSegment> &map) noexcept
@@ -342,10 +353,14 @@ void MapWorld::render(const nyrem::RenderContext &context)
     for (const auto &fp : *m_entities)
         renderList->add(fp);
 
+    static float t = 0.0f;
+    t += 0.01f;
+
     const auto &agents = m_world->getAgents();
     for (const Agent& agent : agents) {
         auto agentEntity = std::make_shared<TransformableEntity>();
         vec2 physPosition = agent.physical().position();
+            //+ nyrem::vec2(4.0f, 4.0f) * cos(t);
         agentEntity->translation().set(
             {physPosition.x, agentHeight, physPosition.y});
         agentEntity->setModel(m_cubeModel);

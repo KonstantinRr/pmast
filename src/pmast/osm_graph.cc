@@ -454,16 +454,13 @@ IndexRoute TrafficGraph::findIndexRoute(
 		// Checks the goal condition. Starts the backpropagation
 		// algorithm if the goal was found to output the shortest route.
 		if (currentNode->node->linked->nodeID == graphBuffer[goal].linked->nodeID) {
-			Route route;
 			IndexRoute idxRoute;
 			do {
-				route.addBack(currentNode->node->linked->nodeID);
 				idxRoute.addBack(currentNode - nodes.data());
 				currentNode = currentNode->previous;
 			} while (currentNode->node->linked->nodeID != graphBuffer[start].linked->nodeID);
-
+			idxRoute.addBack(start);
 			// we actually want to find the way from start to end
-			route.reverse();
 			idxRoute.reverse();
 
 			auto end = std::chrono::steady_clock::now();
