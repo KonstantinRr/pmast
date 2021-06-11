@@ -154,7 +154,6 @@ struct GenericVertex :
 };
 
 // definition of components //
-
 template<size_t Size, typename Type>
 struct VertexComponent2D {
     using ThisType = VertexComponent2D<Size, Type>;
